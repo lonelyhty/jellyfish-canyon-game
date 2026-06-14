@@ -586,6 +586,114 @@
       font-weight: 500;
     }
 
+    .intro-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 12;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% 44%, rgba(121,244,255,.12), transparent 0 34%),
+        radial-gradient(circle at 50% 56%, rgba(1, 9, 18, .5), rgba(0,0,0,.82) 72%);
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .28s ease;
+    }
+
+    .intro-panel.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .intro-box {
+      width: min(680px, calc(100vw - 34px));
+      padding: 22px;
+      border: 1px solid rgba(133, 235, 255, .3);
+      border-radius: 8px;
+      background: rgba(1, 12, 24, .78);
+      box-shadow: 0 24px 90px rgba(0,0,0,.48), inset 0 0 36px rgba(121,244,255,.07);
+    }
+
+    .intro-box h1 {
+      margin: 0 0 10px;
+      color: rgba(238, 255, 255, .96);
+      font-size: 28px;
+      font-weight: 850;
+      letter-spacing: 0;
+    }
+
+    .intro-box p {
+      margin: 0 0 16px;
+      color: rgba(219, 250, 255, .72);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+      margin-bottom: 16px;
+    }
+
+    .intro-tip {
+      min-height: 92px;
+      padding: 11px;
+      border: 1px solid rgba(133, 235, 255, .2);
+      border-radius: 7px;
+      background: rgba(7, 32, 48, .48);
+      color: rgba(225, 250, 255, .7);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .intro-tip b {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--amber);
+      font-size: 13px;
+    }
+
+    .intro-start {
+      width: 100%;
+      height: 42px;
+      border: 1px solid rgba(133, 235, 255, .42);
+      border-radius: 7px;
+      color: rgba(3, 18, 28, .95);
+      background: linear-gradient(90deg, var(--mint), var(--cyan), var(--amber));
+      box-shadow: 0 0 24px rgba(121,244,255,.28);
+      font: 850 14px/1 Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      cursor: pointer;
+    }
+
+    .audio-toggle {
+      position: fixed;
+      z-index: 7;
+      right: 34px;
+      bottom: 84px;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(133, 235, 255, .36);
+      border-radius: 50%;
+      color: var(--text);
+      background: rgba(3, 16, 27, .62);
+      box-shadow: inset 0 0 14px rgba(121,244,255,.1), 0 0 22px rgba(0,0,0,.34);
+      font: 800 18px/1 Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+
+    .audio-toggle[aria-pressed="false"] {
+      color: rgba(224, 250, 255, .46);
+      border-color: rgba(133, 235, 255, .18);
+      box-shadow: inset 0 0 10px rgba(121,244,255,.05), 0 0 14px rgba(0,0,0,.24);
+    }
+
     .touch {
       display: none;
       position: fixed;
@@ -723,6 +831,14 @@
         display: flex;
       }
 
+      .audio-toggle {
+        right: 16px;
+        bottom: 336px;
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+      }
+
       .upgrade-panel {
         bottom: 118px;
       }
@@ -733,6 +849,26 @@
 
       .upgrade-option {
         min-height: 72px;
+      }
+
+      .intro-panel {
+        padding: 15px;
+      }
+
+      .intro-box {
+        padding: 16px;
+      }
+
+      .intro-box h1 {
+        font-size: 22px;
+      }
+
+      .intro-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .intro-tip {
+        min-height: 0;
       }
     }
   </style>
@@ -810,6 +946,21 @@
     <div id="upgradeOptions" class="upgrade-options"></div>
   </section>
 
+  <section id="introPanel" class="intro-panel show" aria-label="游戏说明">
+    <div class="intro-box">
+      <h1>深海水母漫游</h1>
+      <p>在荧光裂谷中收集孢子，唤醒海沟之心；利用声呐、脉冲和疾游穿过风暴，避开热泉与掠食者。</p>
+      <div class="intro-grid">
+        <div class="intro-tip"><b>目标</b>收集荧光孢子，完成裂谷委托；海心苏醒后跟随雷达返回遗迹门。</div>
+        <div class="intro-tip"><b>操作</b>WASD 漂游，Q/E 升降，Shift 疾游，Space 脉冲，R 声呐，拖拽改变视角。</div>
+        <div class="intro-tip"><b>成长</b>记忆碎片和潜层奖励会触发进化选择；靠近物品会有回声提示。</div>
+      </div>
+      <button id="introStart" class="intro-start" type="button">开始漂游</button>
+    </div>
+  </section>
+
+  <button id="audioToggle" class="audio-toggle" type="button" aria-label="背景音乐" aria-pressed="false" title="背景音乐">♪</button>
+
   <nav class="control-bar" aria-label="键盘控制提示">
     <span><b class="key">WASD</b> 漂游</span>
     <span><b class="key">Q / E</b> 升降</span>
@@ -861,6 +1012,9 @@ const screenFlash = document.querySelector("#screenFlash");
 const stormOverlay = document.querySelector("#stormOverlay");
 const upgradePanel = document.querySelector("#upgradePanel");
 const upgradeOptions = document.querySelector("#upgradeOptions");
+const introPanel = document.querySelector("#introPanel");
+const introStart = document.querySelector("#introStart");
+const audioToggle = document.querySelector("#audioToggle");
 const stick = document.querySelector("#stick");
 const thumb = document.querySelector("#thumb");
 const touchUp = document.querySelector("#touchUp");
@@ -929,6 +1083,7 @@ const player = {
   invulnerable: 0,
   companions: 0,
   companionLimit: 4,
+  introOpen: true,
   upgradeOpen: false,
   upgrades: {
     boostEfficiency: 1,
@@ -939,6 +1094,26 @@ const player = {
     collectionReach: 2.7
   },
   won: false
+};
+const music = {
+  enabled: true,
+  started: false,
+  context: null,
+  master: null,
+  padGain: null,
+  bassGain: null,
+  shimmerGain: null,
+  pulseGain: null,
+  sfxGain: null,
+  noiseGain: null,
+  filter: null,
+  delay: null,
+  oscillators: [],
+  noise: null,
+  stepTimer: 0,
+  shimmerTimer: 0,
+  proximityTimer: 0,
+  chordIndex: 0
 };
 const upgradeCatalog = [
   {
@@ -2428,6 +2603,14 @@ function placeRadarMarker(dot, worldPosition, maxDistance = 160) {
 
 function bindInput() {
   addEventListener("keydown", (event) => {
+    if (player.introOpen) {
+      if (event.code === "Enter" || event.code === "Space") {
+        event.preventDefault();
+        startGameFromIntro();
+      }
+      return;
+    }
+    unlockMusic();
     input.keys.add(event.code);
     if (event.code === "Space") {
       event.preventDefault();
@@ -2440,7 +2623,11 @@ function bindInput() {
   });
   addEventListener("keyup", (event) => input.keys.delete(event.code));
 
+  introStart.addEventListener("click", () => startGameFromIntro());
+
   canvas.addEventListener("pointerdown", (event) => {
+    if (player.introOpen) return;
+    unlockMusic();
     input.looking = true;
     input.lastPointer.set(event.clientX, event.clientY);
     canvas.setPointerCapture(event.pointerId);
@@ -2464,11 +2651,20 @@ function bindInput() {
   bindTouchButton(touchDown, -1);
   touchPulse.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    if (player.introOpen) return;
+    unlockMusic();
+    playSfx("click", 0.8);
     triggerPulse();
   });
   touchSonar.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    if (player.introOpen) return;
+    unlockMusic();
+    playSfx("click", 0.8);
     triggerSonar();
+  });
+  audioToggle.addEventListener("click", () => {
+    toggleMusic();
   });
 
   addEventListener("resize", resize);
@@ -2488,6 +2684,7 @@ function bindStick() {
   };
 
   stick.addEventListener("pointerdown", (event) => {
+    unlockMusic();
     pointer = event.pointerId;
     stick.setPointerCapture(pointer);
     update(event);
@@ -2508,6 +2705,9 @@ function bindStick() {
 function bindTouchButton(button, value) {
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    if (player.introOpen) return;
+    unlockMusic();
+    playSfx("click", 0.65);
     input.touchVertical = value;
     button.setPointerCapture(event.pointerId);
   });
@@ -2519,8 +2719,377 @@ function bindTouchButton(button, value) {
   button.addEventListener("pointerleave", release);
 }
 
+function startGameFromIntro() {
+  if (!player.introOpen) return;
+  player.introOpen = false;
+  introPanel.classList.remove("show");
+  unlockMusic(true);
+  playSfx("upgrade", 0.75);
+  showMessage("沿着雷达箭头寻找第一枚荧光孢子。", 1800);
+}
+
+function unlockMusic(force = false) {
+  if (!force && !music.enabled) return;
+  if (!music.context && !createMusicContext()) return;
+  if (music.context.state === "suspended") music.context.resume();
+  music.started = true;
+  audioToggle.setAttribute("aria-pressed", "true");
+}
+
+function toggleMusic() {
+  if (!music.started && music.enabled) {
+    unlockMusic(true);
+    playSfx("click", 0.9);
+    showMessage("背景音乐已开启。", 900);
+    return;
+  }
+  music.enabled = !music.enabled;
+  audioToggle.setAttribute("aria-pressed", `${music.enabled}`);
+  if (music.enabled) {
+    unlockMusic(true);
+    playSfx("click", 0.9);
+    showMessage("背景音乐已开启。", 900);
+  } else {
+    showMessage("背景音乐已静音。", 900);
+  }
+}
+
+function createMusicContext() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) {
+    audioToggle.hidden = true;
+    return false;
+  }
+
+  const ctx = new AudioContext();
+  const master = ctx.createGain();
+  master.gain.value = 0;
+  master.connect(ctx.destination);
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 980;
+  filter.Q.value = 0.9;
+
+  const delay = ctx.createDelay(3);
+  delay.delayTime.value = 0.62;
+  const feedback = ctx.createGain();
+  feedback.gain.value = 0.34;
+  delay.connect(feedback);
+  feedback.connect(delay);
+  delay.connect(master);
+
+  const padGain = ctx.createGain();
+  padGain.gain.value = 0.28;
+  padGain.connect(filter);
+  filter.connect(master);
+  filter.connect(delay);
+
+  const bassGain = ctx.createGain();
+  bassGain.gain.value = 0.12;
+  bassGain.connect(master);
+
+  const shimmerGain = ctx.createGain();
+  shimmerGain.gain.value = 0.22;
+  shimmerGain.connect(delay);
+  shimmerGain.connect(master);
+
+  const pulseGain = ctx.createGain();
+  pulseGain.gain.value = 1;
+  pulseGain.connect(master);
+
+  const sfxGain = ctx.createGain();
+  sfxGain.gain.value = 0.82;
+  sfxGain.connect(delay);
+  sfxGain.connect(master);
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0.038;
+  noiseGain.connect(filter);
+
+  const padFrequencies = [49, 73.42, 98, 146.83, 196];
+  music.oscillators = padFrequencies.map((frequency, index) => {
+    const gain = ctx.createGain();
+    gain.gain.value = index === 0 ? 0.18 : index === 4 ? 0.045 : 0.095;
+    const osc = ctx.createOscillator();
+    osc.type = index === 0 ? "sine" : index === 4 ? "sine" : "triangle";
+    osc.frequency.value = frequency;
+    osc.connect(gain);
+    gain.connect(padGain);
+    osc.start();
+    return { osc, gain, frequency };
+  });
+
+  const bassOsc = ctx.createOscillator();
+  bassOsc.type = "sine";
+  bassOsc.frequency.value = 36.71;
+  bassOsc.connect(bassGain);
+  bassOsc.start();
+  music.oscillators.push({ osc: bassOsc, gain: bassGain, frequency: 36.71, bass: true });
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = createNoiseBuffer(ctx);
+  noise.loop = true;
+  noise.connect(noiseGain);
+  noise.start();
+
+  music.context = ctx;
+  music.master = master;
+  music.padGain = padGain;
+  music.bassGain = bassGain;
+  music.shimmerGain = shimmerGain;
+  music.pulseGain = pulseGain;
+  music.sfxGain = sfxGain;
+  music.noiseGain = noiseGain;
+  music.filter = filter;
+  music.delay = delay;
+  music.noise = noise;
+  return true;
+}
+
+function createNoiseBuffer(ctx) {
+  const length = ctx.sampleRate * 3;
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < length; i += 1) {
+    last = last * 0.985 + (Math.random() * 2 - 1) * 0.015;
+    data[i] = last;
+  }
+  return buffer;
+}
+
+function updateMusic(delta, time) {
+  if (!music.context) return;
+  const ctx = music.context;
+  const now = ctx.currentTime;
+  const tension = THREE.MathUtils.clamp(storm.intensity * 0.55 + (leviathanState.active ? 0.55 : 0) + player.hazard * 0.22 + player.boostHeat * 0.12, 0, 1);
+  const targetVolume = music.enabled ? 0.66 : 0;
+  music.master.gain.setTargetAtTime(targetVolume, now, 0.38);
+  music.filter.frequency.setTargetAtTime(760 + tension * 1200 + player.sonarWave * 520, now, 0.32);
+  music.padGain.gain.setTargetAtTime(0.27 - tension * 0.055, now, 0.45);
+  music.bassGain.gain.setTargetAtTime(0.105 + tension * 0.1, now, 0.28);
+  music.noiseGain.gain.setTargetAtTime(0.026 + storm.intensity * 0.085 + (leviathanState.active ? 0.035 : 0), now, 0.45);
+
+  music.stepTimer -= delta;
+  if (music.stepTimer <= 0) {
+    advanceMusicChord(tension);
+    music.stepTimer = 6.4 - tension * 2.2;
+  }
+
+  music.shimmerTimer -= delta;
+  if (music.shimmerTimer <= 0 && music.enabled) {
+    playShimmer(tension);
+    if (tension > 0.35) playBassPulse(tension);
+    music.shimmerTimer = THREE.MathUtils.randFloat(1.9 - tension * 0.7, 4.4 - tension * 1.3);
+  }
+  updateProximitySound(delta);
+}
+
+function advanceMusicChord(tension) {
+  if (!music.context) return;
+  const now = music.context.currentTime;
+  const calmChords = [
+    [49, 73.42, 98, 146.83, 196],
+    [55, 82.41, 110, 164.81, 220],
+    [46.25, 69.3, 92.5, 138.59, 185],
+    [61.74, 92.5, 123.47, 185, 246.94],
+    [41.2, 61.74, 82.41, 123.47, 164.81]
+  ];
+  const tenseChords = [
+    [51.91, 77.78, 103.83, 155.56, 207.65],
+    [46.25, 69.3, 92.5, 138.59, 185],
+    [58.27, 87.31, 116.54, 174.61, 233.08]
+  ];
+  const chords = tension > 0.42 ? tenseChords : calmChords;
+  music.chordIndex = (music.chordIndex + 1) % chords.length;
+  const chord = chords[music.chordIndex];
+  music.oscillators.forEach((entry, index) => {
+    if (entry.bass) {
+      entry.osc.frequency.setTargetAtTime(chord[0] * 0.5, now, 1.2);
+    } else {
+      entry.osc.frequency.setTargetAtTime(chord[index % chord.length], now, 1.5);
+    }
+  });
+}
+
+function playShimmer(tension) {
+  if (!music.context) return;
+  const ctx = music.context;
+  const now = ctx.currentTime;
+  const scale = [196, 220, 246.94, 293.66, 329.63, 392, 440, 493.88, 587.33];
+  const frequency = scale[Math.floor(Math.random() * scale.length)] * (tension > 0.5 ? 0.84 : 1);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(frequency, now);
+  osc.frequency.exponentialRampToValueAtTime(frequency * (1.01 + Math.random() * 0.08), now + 1.2);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.082 + tension * 0.045, now + 0.08);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 2.1 + Math.random() * 1.4);
+  osc.connect(gain);
+  gain.connect(music.shimmerGain);
+  osc.start(now);
+  osc.stop(now + 3.2);
+}
+
+function playBassPulse(tension) {
+  if (!music.context) return;
+  const ctx = music.context;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(42 + tension * 16, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(0.09 + tension * 0.08, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.62);
+  osc.connect(gain);
+  gain.connect(music.pulseGain);
+  osc.start(now);
+  osc.stop(now + 0.7);
+}
+
+function playSfx(type, intensity = 1) {
+  if (!music.enabled) return;
+  unlockMusic();
+  if (!music.context || !music.sfxGain) return;
+  const ctx = music.context;
+  const now = ctx.currentTime;
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.Q.value = 1.8;
+  gain.connect(filter);
+  filter.connect(music.sfxGain);
+
+  if (type === "click") {
+    filter.frequency.setValueAtTime(740, now);
+    playTone(now, 620, 0.045 * intensity, 0.12, "triangle", gain);
+    playTone(now + 0.025, 920, 0.025 * intensity, 0.1, "sine", gain);
+    return;
+  }
+
+  if (type === "pulse") {
+    filter.frequency.setValueAtTime(130, now);
+    playTone(now, 86, 0.18 * intensity, 0.5, "sine", gain, 0.55);
+    playNoiseBurst(now, 0.13 * intensity, 0.34, gain, 0.7);
+    return;
+  }
+
+  if (type === "sonar") {
+    filter.frequency.setValueAtTime(1200, now);
+    playTone(now, 520, 0.12 * intensity, 0.46, "sine", gain, 1.9);
+    playTone(now + 0.11, 780, 0.07 * intensity, 0.38, "sine", gain, 1.6);
+    return;
+  }
+
+  if (type === "collect") {
+    filter.frequency.setValueAtTime(1600, now);
+    playTone(now, 880, 0.1 * intensity, 0.26, "sine", gain, 1.25);
+    playTone(now + 0.055, 1320, 0.075 * intensity, 0.34, "triangle", gain, 1.16);
+    return;
+  }
+
+  if (type === "memory") {
+    filter.frequency.setValueAtTime(1180, now);
+    playTone(now, 440, 0.08 * intensity, 0.42, "sine", gain, 1.32);
+    playTone(now + 0.09, 740, 0.09 * intensity, 0.5, "sine", gain, 1.25);
+    playTone(now + 0.16, 1110, 0.055 * intensity, 0.48, "sine", gain, 1.12);
+    return;
+  }
+
+  if (type === "near") {
+    filter.frequency.setValueAtTime(980, now);
+    playTone(now, 392, 0.032 * intensity, 0.55, "sine", gain, 1.18);
+    playTone(now + 0.12, 587.33, 0.024 * intensity, 0.48, "sine", gain, 1.1);
+    return;
+  }
+
+  if (type === "warning") {
+    filter.frequency.setValueAtTime(260, now);
+    playTone(now, 120, 0.13 * intensity, 0.75, "sawtooth", gain, 0.7);
+    return;
+  }
+
+  if (type === "upgrade") {
+    filter.frequency.setValueAtTime(1500, now);
+    playTone(now, 523.25, 0.09 * intensity, 0.34, "sine", gain, 1.4);
+    playTone(now + 0.08, 783.99, 0.08 * intensity, 0.42, "sine", gain, 1.28);
+    playTone(now + 0.18, 1046.5, 0.065 * intensity, 0.52, "sine", gain, 1.16);
+  }
+}
+
+function playTone(start, frequency, volume, duration, type, output, sweep = 1) {
+  const ctx = music.context;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, start);
+  if (sweep !== 1) osc.frequency.exponentialRampToValueAtTime(Math.max(20, frequency * sweep), start + duration);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.linearRampToValueAtTime(volume, start + Math.min(0.035, duration * 0.25));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  osc.connect(gain);
+  gain.connect(output);
+  osc.start(start);
+  osc.stop(start + duration + 0.04);
+}
+
+function playNoiseBurst(start, volume, duration, output, cutoff = 0.5) {
+  const ctx = music.context;
+  const source = ctx.createBufferSource();
+  source.buffer = createNoiseBuffer(ctx);
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 1200 * cutoff;
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.linearRampToValueAtTime(volume, start + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(output);
+  source.start(start);
+  source.stop(start + duration + 0.04);
+}
+
+function updateProximitySound(delta) {
+  if (!music.enabled || !music.context) return;
+  music.proximityTimer = Math.max(0, music.proximityTimer - delta);
+  if (music.proximityTimer > 0) return;
+  const target = nearestAudibleObject();
+  if (!target) return;
+  const distance = target.position.distanceTo(player.group.position);
+  if (distance > target.range) return;
+  const intensity = THREE.MathUtils.clamp(1 - distance / target.range, 0.18, 1);
+  playSfx("near", intensity * target.weight);
+  music.proximityTimer = THREE.MathUtils.lerp(2.8, 0.75, intensity);
+}
+
+function nearestAudibleObject() {
+  let nearest = null;
+  const consider = (position, range, weight = 1) => {
+    const distance = position.distanceToSquared(player.group.position);
+    if (!nearest || distance < nearest.distance) nearest = { position, range, weight, distance };
+  };
+  spores.forEach((spore) => {
+    if (!spore.collected) consider(spore.group.position, 26, 0.72);
+  });
+  memoryShards.items.forEach((shard) => {
+    if (!shard.collected) consider(shard.group.position, 32, 0.92);
+  });
+  boostRings.rings.forEach((ring) => {
+    if (ring.userData.cooldown <= 0) consider(ring.position, 22, 0.68);
+  });
+  sanctuaries.items.forEach((sanctuary) => consider(sanctuary.group.position, 28, 0.58));
+  if (player.gateOpened) consider(heartGate.group.position, 42, 0.85);
+  return nearest;
+}
+
 function triggerPulse() {
-  if (player.cooldown > 0 || player.energy < 8) return;
+  if (player.introOpen || player.cooldown > 0 || player.energy < 8) return;
+  playSfx("pulse", 1);
   const dir = player.intent.lengthSq() > 0.04 ? player.intent : getForward();
   player.velocity.addScaledVector(dir, 14.5);
   player.energy = Math.max(0, player.energy - 8);
@@ -2532,7 +3101,8 @@ function triggerPulse() {
 }
 
 function triggerSonar() {
-  if (player.upgradeOpen || player.sonarCooldown > 0 || player.energy < 10) return;
+  if (player.introOpen || player.upgradeOpen || player.sonarCooldown > 0 || player.energy < 10) return;
+  playSfx("sonar", 1);
   const range = player.upgrades.echoRange;
   player.energy = Math.max(0, player.energy - 10);
   player.sonarCooldown = player.upgrades.echoCooldown;
@@ -2613,6 +3183,7 @@ function update(delta, time) {
   updateCamera(delta);
   updateHud();
   updateMission(delta);
+  updateMusic(delta, time);
   animateMaterials(time);
 }
 
@@ -2621,7 +3192,7 @@ function updateMovement(delta) {
   right.set(Math.cos(input.yaw), 0, -Math.sin(input.yaw)).normalize();
   player.intent.set(0, 0, 0);
 
-  if (!player.upgradeOpen) {
+  if (!player.upgradeOpen && !player.introOpen) {
     if (input.keys.has("KeyW") || input.keys.has("ArrowUp")) player.intent.add(fwd);
     if (input.keys.has("KeyS") || input.keys.has("ArrowDown")) player.intent.addScaledVector(fwd, -1);
     if (input.keys.has("KeyA") || input.keys.has("ArrowLeft")) player.intent.addScaledVector(right, -1);
@@ -2889,6 +3460,7 @@ function updateBoostRings(time, delta) {
       raiseCombo(1);
       awardScore(90, "疾流穿环");
       reportMission("ring", 1);
+      playSfx("collect", 0.85);
       addTrailBurst(10, 1.25);
       flashScreen();
     }
@@ -2924,6 +3496,7 @@ function updatePredators(time, delta) {
       player.energy = Math.min(player.maxEnergy, player.energy + 10);
       raiseCombo(1);
       awardScore(150, "脉冲震退");
+      playSfx("pulse", 0.75);
       flashScreen();
     }
 
@@ -3041,6 +3614,7 @@ function startLeviathanEvent() {
   leviathan.group.visible = true;
   storm.target = Math.max(storm.target, 0.75);
   storm.duration = Math.max(storm.duration, 14);
+  playSfx("warning", 1);
   showMessage("深渊幽影苏醒了。用声呐照出弱点，再用脉冲逼退它。", 3200);
   flashScreen("hit");
 }
@@ -3053,6 +3627,7 @@ function damageLeviathan(amount, label) {
   player.magnet = Math.max(player.magnet, 0.8);
   awardScore(120, label);
   reportMission("sonar", 1);
+  playSfx("pulse", 0.9);
   addTrailBurst(7, 1.25);
   flashScreen();
   if (leviathanState.health <= 0) endLeviathanEvent(true);
@@ -3067,6 +3642,7 @@ function endLeviathanEvent(defeated) {
   if (defeated) {
     awardScore(900, "幽影退潮");
     reportMission("leviathan", 1);
+    playSfx("upgrade", 1);
     player.energy = Math.min(player.maxEnergy, player.energy + 26);
     if (player.companions < player.companionLimit) player.companions += 1;
     showMessage("幽影沉回海沟，裂谷短暂安静下来。", 2200);
@@ -3264,6 +3840,7 @@ function collectMemoryShard(shard) {
   raiseCombo(1);
   awardScore(220, "记忆碎片");
   reportMission("memory", 1);
+  playSfx("memory", 1);
   player.energy = Math.min(player.maxEnergy, player.energy + 9);
   player.magnet = Math.max(player.magnet, 0.9 + player.upgrades.magnetBonus);
   addTrailBurst(9, 1.25);
@@ -3284,6 +3861,7 @@ function collectSpore(spore) {
   raiseCombo(1);
   awardScore(120, player.combo > 3 ? "连锁吸收" : "荧光孢子");
   reportMission("spore", 1);
+  playSfx("collect", 0.92);
   player.energy = Math.min(player.maxEnergy, player.energy + 13 + player.combo * 1.8);
   player.pulse = Math.max(player.pulse, 0.72);
   player.magnet = Math.max(player.magnet, 0.72 + player.upgrades.magnetBonus);
@@ -3353,6 +3931,7 @@ function completeMission() {
   player.memories = Math.min(2, player.memories + 1);
   comboText.textContent = `委托完成 +${gained}`;
   scoreValue.textContent = player.score.toLocaleString("zh-CN");
+  playSfx("upgrade", 0.84);
   showMessage(`裂谷委托完成：${mission.title}`, 1300);
   addTrailBurst(12, 1.35);
   flashScreen();
@@ -3384,6 +3963,7 @@ function openHeartGate() {
   player.magnet = Math.max(player.magnet, 1.4);
   player.pulse = Math.max(player.pulse, 1);
   awardScore(600, "海心苏醒");
+  playSfx("upgrade", 1);
   addTrailBurst(18, 1.65);
   showMessage("海沟之心已苏醒，跟随雷达返回遗迹门。", 2600);
   flashScreen();
@@ -3401,6 +3981,7 @@ function completeStage() {
   player.energy = player.maxEnergy;
   player.pulse = 1;
   player.magnet = 1.5;
+  playSfx("upgrade", 1.1);
   addTrailBurst(24, 1.9);
   showMessage(`裂谷展开到第 ${player.stage} 潜层，目标提升为 ${world.objective} 个孢子。`, 3200);
   flashScreen();
@@ -3421,7 +4002,10 @@ function offerUpgradeChoices() {
     button.type = "button";
     button.className = "upgrade-option";
     button.innerHTML = `<b>${upgrade.name}</b><span>${upgrade.text}</span>`;
-    button.addEventListener("click", () => chooseUpgrade(upgrade), { once: true });
+    button.addEventListener("click", () => {
+      playSfx("click", 0.8);
+      chooseUpgrade(upgrade);
+    }, { once: true });
     upgradeOptions.appendChild(button);
   });
   upgradePanel.classList.add("show");
@@ -3433,6 +4017,7 @@ function chooseUpgrade(upgrade) {
   player.upgradeOpen = false;
   upgradePanel.classList.remove("show");
   awardScore(260, upgrade.name);
+  playSfx("upgrade", 1);
   showMessage(`${upgrade.name} 已共鸣。`, 1400);
   addTrailBurst(14, 1.45);
   flashScreen();
@@ -3491,6 +4076,7 @@ function updateSanctuaries(time, delta) {
       sanctuary.ready = 16;
       awardScore(90, "圣所共鸣");
       reportMission("sanctuary", 1);
+      playSfx("upgrade", 0.72);
       if (player.companions < player.companionLimit) player.companions += 1;
       showMessage("圣所回声为你稳定洋流。", 1200);
       addTrailBurst(10, 1.2);
