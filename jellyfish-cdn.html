@@ -2385,6 +2385,12 @@ const sceneProfiles = {
     background: 0x010711,
     fog: 0x031322,
     fogDensity: 0.011,
+    accent: 0x79f4ff,
+    secondary: 0xb99cff,
+    css: { cyan: "#79f4ff", cyanSoft: "rgba(121, 244, 255, 0.72)", violet: "#b99cff", mint: "#76ffd2" },
+    light: { hemi: 0x3b9aca, ground: 0x020713, moon: 0x9de7ff, side: 0x8b72ff, exposure: 1.16 },
+    flow: { planktonLift: 0.1, planktonDrift: 0.12, streamSpeed: 1.22, streamOpacity: 1.24, bloom: 0.04 },
+    remoteNames: ["Blue_17", "RiftEcho", "Lantern_09"],
     message: "蓝潮裂谷已接入，稳定水层适合开始潜航。"
   },
   "night-reef": {
@@ -2395,6 +2401,12 @@ const sceneProfiles = {
     background: 0x030817,
     fog: 0x17123d,
     fogDensity: 0.013,
+    accent: 0xb99cff,
+    secondary: 0x7aa8ff,
+    css: { cyan: "#b99cff", cyanSoft: "rgba(185, 156, 255, 0.68)", violet: "#7aa8ff", mint: "#9ffbff" },
+    light: { hemi: 0x4439a4, ground: 0x040614, moon: 0xc0b2ff, side: 0x6f8cff, exposure: 1.08 },
+    flow: { planktonLift: 0.055, planktonDrift: 0.055, streamSpeed: 0.72, streamOpacity: 0.62, bloom: 0.18 },
+    remoteNames: ["Nocturne", "Crystal_21", "ReefGhost"],
     message: "夜光礁海已接入，晶辉穹顶的声呐回声更加明亮。"
   },
   "silent-tide": {
@@ -2405,6 +2417,12 @@ const sceneProfiles = {
     background: 0x021117,
     fog: 0x06332e,
     fogDensity: 0.014,
+    accent: 0x76ffd2,
+    secondary: 0x4fe1ff,
+    css: { cyan: "#76ffd2", cyanSoft: "rgba(118, 255, 210, 0.64)", violet: "#4fe1ff", mint: "#b7ffd9" },
+    light: { hemi: 0x236f67, ground: 0x02120d, moon: 0x98ffd6, side: 0x4fe1ff, exposure: 1.0 },
+    flow: { planktonLift: 0.025, planktonDrift: 0.035, streamSpeed: 0.48, streamOpacity: 0.38, bloom: 0.04 },
+    remoteNames: ["Tide_03", "QuietBay", "GardenPulse"],
     message: "静潮深湾已接入，深层海流安静但更幽暗。"
   }
 };
@@ -2909,7 +2927,7 @@ const shardTexture = makeShardTexture();
 const sparkTexture = makeSparkTexture();
 const streakTexture = makeStreakTexture();
 
-setupLights();
+const sceneLightRig = setupLights();
 scene.add(createAbyssBackdrop());
 scene.add(createVolumeCurtains());
 scene.add(createCanyonWorld());
@@ -2928,6 +2946,9 @@ scene.add(fishSchools.group);
 
 const glowStreams = createGlowStreams();
 scene.add(glowStreams.group);
+
+const sceneAtmospherics = createSceneAtmospherics();
+scene.add(sceneAtmospherics.group);
 
 const heartGate = createHeartGate();
 scene.add(heartGate.group);
@@ -3043,10 +3064,12 @@ function setupLights() {
     [-126, -16, -112, 0x31e7d8, 1.1],
     [138, -12, 18, 0x4ddaff, 1.25]
   ];
+  const reefPointLights = [];
   reefLights.forEach(([x, y, z, color, intensity]) => {
     const light = new THREE.PointLight(color, intensity, 78, 1.75);
     light.position.set(x, y, z);
     scene.add(light);
+    reefPointLights.push(light);
   });
 
   const playerLight = new THREE.PointLight(0x78f7ff, 5.2, 55, 1.55);
@@ -3057,6 +3080,8 @@ function setupLights() {
   const pulseLight = new THREE.PointLight(0xc2a6ff, 0, 88, 1.45);
   player.group.add(pulseLight);
   player.pulseLight = pulseLight;
+
+  return { hemi, moon, side, reefPointLights, playerLight, pulseLight };
 }
 
 function createAbyssBackdrop() {
@@ -3744,6 +3769,252 @@ function createGlowStreams() {
   }
 
   return { group, streams };
+}
+
+function createSceneAtmospherics() {
+  const group = new THREE.Group();
+  const environments = {
+    "blue-rift": createBlueRiftAtmosphere(sceneProfiles["blue-rift"]),
+    "night-reef": createNightReefAtmosphere(sceneProfiles["night-reef"]),
+    "silent-tide": createSilentTideAtmosphere(sceneProfiles["silent-tide"])
+  };
+
+  Object.values(environments).forEach((environment) => {
+    environment.group.visible = environment.id === activeSceneProfile.id;
+    group.add(environment.group);
+  });
+
+  return { group, environments };
+}
+
+function createBlueRiftAtmosphere(profile) {
+  const group = new THREE.Group();
+  const streams = [];
+  for (let s = 0; s < 7; s += 1) {
+    const points = [];
+    const lane = s - 3;
+    const xBase = profile.spawn.x + lane * 17;
+    const yBase = profile.spawn.y + 10 + Math.sin(s) * 6;
+    const zBase = profile.spawn.z - 115 + s * 22;
+    for (let i = 0; i < 28; i += 1) {
+      const p = i / 27;
+      points.push(new THREE.Vector3(
+        xBase + Math.sin(p * Math.PI * 2.4 + s) * (12 + s * 1.6) + p * 58,
+        yBase + Math.sin(p * Math.PI * 3.1 + s * 0.4) * 4.8,
+        zBase + p * 126
+      ));
+    }
+    const curve = new THREE.CatmullRomCurve3(points);
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(curve.getPoints(130)),
+      new THREE.LineBasicMaterial({
+        color: s % 2 === 0 ? profile.accent : profile.secondary,
+        transparent: true,
+        opacity: 0.16 + s * 0.008,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    group.add(line);
+
+    const motes = [];
+    for (let i = 0; i < 24; i += 1) {
+      const mote = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glowTexture,
+        color: i % 3 === 0 ? profile.secondary : profile.accent,
+        transparent: true,
+        opacity: 0.2 + Math.random() * 0.28,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      }));
+      mote.userData = {
+        t: Math.random(),
+        speed: THREE.MathUtils.randFloat(0.035, 0.07),
+        phase: Math.random() * Math.PI * 2,
+        scale: THREE.MathUtils.randFloat(0.85, 2.1)
+      };
+      mote.scale.setScalar(mote.userData.scale);
+      group.add(mote);
+      motes.push(mote);
+    }
+    streams.push({ curve, line, motes, seed: Math.random() * 100 });
+  }
+  return { id: profile.id, kind: "flow", group, streams };
+}
+
+function createNightReefAtmosphere(profile) {
+  const group = new THREE.Group();
+  const crystals = [];
+  const glints = [];
+  const crystalGeometry = new THREE.ConeGeometry(0.82, 6.8, 5);
+  const smallCrystalGeometry = new THREE.ConeGeometry(0.44, 3.8, 5);
+  for (let c = 0; c < 12; c += 1) {
+    const angle = (c / 12) * Math.PI * 2;
+    const radius = THREE.MathUtils.randFloat(24, 86);
+    const cluster = new THREE.Group();
+    cluster.position.set(
+      profile.spawn.x + Math.cos(angle) * radius,
+      profile.spawn.y + THREE.MathUtils.randFloat(-7, 18),
+      profile.spawn.z + Math.sin(angle) * radius
+    );
+    cluster.rotation.y = Math.random() * Math.PI * 2;
+    for (let i = 0; i < 6; i += 1) {
+      const material = new THREE.MeshBasicMaterial({
+        color: i % 2 === 0 ? profile.accent : profile.secondary,
+        transparent: true,
+        opacity: 0.24 + Math.random() * 0.26,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const crystal = new THREE.Mesh(i % 3 === 0 ? crystalGeometry : smallCrystalGeometry, material);
+      const shardAngle = (i / 6) * Math.PI * 2;
+      crystal.position.set(Math.cos(shardAngle) * (1.4 + i * 0.16), -1.5 + i * 0.42, Math.sin(shardAngle) * (1.4 + i * 0.16));
+      crystal.rotation.set(THREE.MathUtils.randFloatSpread(0.28), shardAngle, THREE.MathUtils.randFloatSpread(0.22));
+      crystal.scale.setScalar(THREE.MathUtils.randFloat(0.85, 1.45));
+      crystal.userData.phase = Math.random() * Math.PI * 2;
+      cluster.add(crystal);
+      crystals.push(crystal);
+    }
+    group.add(cluster);
+  }
+
+  for (let i = 0; i < 76; i += 1) {
+    const glint = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: sparkTexture,
+      color: i % 4 === 0 ? 0xe8e2ff : profile.accent,
+      transparent: true,
+      opacity: 0.16 + Math.random() * 0.32,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    }));
+    glint.position.set(
+      profile.spawn.x + THREE.MathUtils.randFloatSpread(150),
+      profile.spawn.y + THREE.MathUtils.randFloat(-4, 62),
+      profile.spawn.z + THREE.MathUtils.randFloatSpread(150)
+    );
+    glint.userData = {
+      baseY: glint.position.y,
+      phase: Math.random() * Math.PI * 2,
+      scale: THREE.MathUtils.randFloat(0.7, 2.5)
+    };
+    glint.scale.setScalar(glint.userData.scale);
+    group.add(glint);
+    glints.push(glint);
+  }
+
+  return { id: profile.id, kind: "crystal", group, crystals, glints };
+}
+
+function createSilentTideAtmosphere(profile) {
+  const group = new THREE.Group();
+  const blossoms = [];
+  const veils = [];
+  const motes = [];
+
+  for (let i = 0; i < 18; i += 1) {
+    const blossom = new THREE.Group();
+    const angle = (i / 18) * Math.PI * 2;
+    const radius = THREE.MathUtils.randFloat(24, 104);
+    blossom.position.set(
+      profile.spawn.x + Math.cos(angle) * radius,
+      profile.spawn.y + THREE.MathUtils.randFloat(-8, 26),
+      profile.spawn.z + Math.sin(angle) * radius
+    );
+
+    const core = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: profile.accent,
+      transparent: true,
+      opacity: 0.2,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    }));
+    core.scale.set(3.6, 3.6, 1);
+    blossom.add(core);
+
+    for (let p = 0; p < 6; p += 1) {
+      const petal = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: beamTexture,
+        color: p % 2 === 0 ? profile.accent : profile.secondary,
+        transparent: true,
+        opacity: 0.105,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      }));
+      const petalAngle = (p / 6) * Math.PI * 2;
+      petal.position.set(Math.cos(petalAngle) * 2.4, 0, Math.sin(petalAngle) * 2.4);
+      petal.scale.set(4.2, 11.4, 1);
+      petal.rotation.z = petalAngle;
+      blossom.add(petal);
+    }
+
+    blossom.userData = {
+      baseY: blossom.position.y,
+      baseScale: THREE.MathUtils.randFloat(0.72, 1.24),
+      phase: Math.random() * Math.PI * 2,
+      spin: THREE.MathUtils.randFloat(0.025, 0.065),
+      core
+    };
+    blossom.scale.setScalar(blossom.userData.baseScale);
+    group.add(blossom);
+    blossoms.push(blossom);
+  }
+
+  for (let i = 0; i < 10; i += 1) {
+    const veilAngle = (i / 10) * Math.PI * 2 + THREE.MathUtils.randFloatSpread(0.34);
+    const veilRadius = THREE.MathUtils.randFloat(54, 134);
+    const veil = new THREE.Mesh(
+      new THREE.PlaneGeometry(18 + Math.random() * 18, 84 + Math.random() * 38),
+      new THREE.MeshBasicMaterial({
+        map: beamTexture,
+        color: i % 2 === 0 ? profile.accent : profile.secondary,
+        transparent: true,
+        opacity: 0.018 + Math.random() * 0.024,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      })
+    );
+    veil.position.set(
+      profile.spawn.x + Math.cos(veilAngle) * veilRadius,
+      profile.spawn.y + THREE.MathUtils.randFloat(14, 56),
+      profile.spawn.z + Math.sin(veilAngle) * veilRadius
+    );
+    veil.rotation.set(THREE.MathUtils.randFloatSpread(0.12), Math.random() * Math.PI, THREE.MathUtils.degToRad(62 + Math.random() * 20));
+    veil.userData = {
+      baseY: veil.position.y,
+      phase: Math.random() * Math.PI * 2,
+      drift: THREE.MathUtils.randFloat(0.006, 0.018)
+    };
+    group.add(veil);
+    veils.push(veil);
+  }
+
+  for (let i = 0; i < 64; i += 1) {
+    const mote = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: i % 3 === 0 ? 0xb7ffd9 : profile.accent,
+      transparent: true,
+      opacity: 0.12 + Math.random() * 0.2,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    }));
+    mote.position.set(
+      profile.spawn.x + THREE.MathUtils.randFloatSpread(160),
+      profile.spawn.y + THREE.MathUtils.randFloat(-16, 54),
+      profile.spawn.z + THREE.MathUtils.randFloatSpread(160)
+    );
+    mote.userData = {
+      baseY: mote.position.y,
+      phase: Math.random() * Math.PI * 2,
+      scale: THREE.MathUtils.randFloat(0.6, 1.8)
+    };
+    mote.scale.setScalar(mote.userData.scale);
+    group.add(mote);
+    motes.push(mote);
+  }
+
+  return { id: profile.id, kind: "garden", group, blossoms, veils, motes };
 }
 
 function createHeartGate() {
@@ -5642,6 +5913,63 @@ function sceneProfileFor(id) {
   return sceneProfiles[id] || sceneProfiles["blue-rift"];
 }
 
+function applySceneTheme(profile) {
+  const root = document.documentElement;
+  const css = profile.css || sceneProfiles["blue-rift"].css;
+  root.style.setProperty("--cyan", css.cyan);
+  root.style.setProperty("--cyan-soft", css.cyanSoft);
+  root.style.setProperty("--violet", css.violet);
+  root.style.setProperty("--mint", css.mint);
+}
+
+function applySceneLighting(profile) {
+  if (!sceneLightRig) return;
+  const light = profile.light || sceneProfiles["blue-rift"].light;
+  sceneLightRig.hemi.color.setHex(light.hemi);
+  sceneLightRig.hemi.groundColor.setHex(light.ground);
+  sceneLightRig.moon.color.setHex(light.moon);
+  sceneLightRig.side.color.setHex(light.side);
+  renderer.toneMappingExposure = light.exposure || 1.16;
+  sceneLightRig.playerLight.color.setHex(profile.accent);
+  sceneLightRig.pulseLight.color.setHex(profile.secondary);
+  sceneLightRig.reefPointLights.forEach((point, index) => {
+    point.color.setHex(index % 2 === 0 ? profile.accent : profile.secondary);
+    point.intensity = 1.0 + (index % 4) * 0.22 + (profile.flow?.bloom || 0) * 2.2;
+  });
+}
+
+function applySceneAtmosphere(id) {
+  Object.entries(sceneAtmospherics.environments).forEach(([environmentId, environment]) => {
+    environment.group.visible = environmentId === id;
+  });
+}
+
+function applySceneRemoteIdentity(profile) {
+  if (!remotePlayer?.label?.material) return;
+  const names = profile.remoteNames || [remotePlayer.name || "Abyss_09"];
+  const name = names[THREE.MathUtils.randInt(0, names.length - 1)];
+  const oldMap = remotePlayer.label.material.map;
+  remotePlayer.name = name;
+  remotePlayer.label.material.map = makeNameTexture(name);
+  remotePlayer.label.material.needsUpdate = true;
+  remotePlayer.light.color.setHex(profile.accent);
+  remotePlayer.pulseLight.color.setHex(profile.secondary);
+  if (oldMap) oldMap.dispose();
+}
+
+function retintAmbientLife(profile) {
+  fishSchools.schools.forEach((school, schoolIndex) => {
+    school.userData.fish.forEach((fish, fishIndex) => {
+      fish.material.color.setHex((schoolIndex + fishIndex) % 4 === 0 ? profile.secondary : profile.accent);
+    });
+  });
+  ambientJellies.jellies.forEach((jelly, jellyIndex) => {
+    jelly.children.forEach((child) => {
+      if (child.material?.color) child.material.color.setHex(jellyIndex % 3 === 0 ? profile.secondary : profile.accent);
+    });
+  });
+}
+
 function applySceneProfile(id, movePlayer = true) {
   const profile = sceneProfileFor(id);
   activeSceneProfile = profile;
@@ -5650,6 +5978,11 @@ function applySceneProfile(id, movePlayer = true) {
   scene.background.copy(baseSceneColor);
   scene.fog.color.copy(baseFogColor);
   scene.fog.density = profile.fogDensity;
+  applySceneTheme(profile);
+  applySceneLighting(profile);
+  applySceneAtmosphere(profile.id);
+  applySceneRemoteIdentity(profile);
+  retintAmbientLife(profile);
   if (movePlayer) {
     player.group.position.copy(profile.spawn);
     player.velocity.set(0, 0, 0);
@@ -7664,6 +7997,7 @@ function update(delta, time) {
   updatePlankton(delta, time);
   updateFishSchools(time, delta);
   updateGlowStreams(time, delta);
+  updateSceneAtmosphere(time, delta);
   updateStorm(time, delta);
   updateHeartGate(time, delta);
   updateReefGlow(time, delta);
@@ -7966,10 +8300,13 @@ function updateRibbonArm(ribbon, time, beat, velocity = player.velocity) {
 function updatePlankton(delta, time) {
   const p = plankton.positions;
   const center = player.group.position;
+  const flow = activeSceneProfile.flow || {};
+  const lift = flow.planktonLift ?? 0.08;
+  const drift = flow.planktonDrift ?? 0.08;
   for (let i = 0; i < plankton.count; i += 1) {
     const k = i * 3;
-    p[k + 1] += Math.sin(time * 0.45 + i) * 0.003 + delta * 0.08;
-    p[k] += Math.sin(time * 0.1 + i * 0.07) * delta * 0.08;
+    p[k + 1] += Math.sin(time * 0.45 + i) * 0.003 + delta * lift;
+    p[k] += Math.sin(time * 0.1 + i * 0.07) * delta * drift;
     if (p[k] - center.x > 205) p[k] -= 410;
     if (p[k] - center.x < -205) p[k] += 410;
     if (p[k + 1] - center.y > 88) p[k + 1] -= 165;
@@ -8000,15 +8337,74 @@ function updateFishSchools(time, delta) {
 }
 
 function updateGlowStreams(time, delta) {
+  const flow = activeSceneProfile.flow || {};
+  const speedScale = flow.streamSpeed || 1;
+  const opacityScale = flow.streamOpacity || 1;
   glowStreams.streams.forEach((stream, streamIndex) => {
-    stream.line.material.opacity = 0.1 + Math.sin(time * 0.8 + stream.seed) * 0.04;
+    stream.line.material.opacity = (0.1 + Math.sin(time * 0.8 + stream.seed) * 0.04) * opacityScale;
     stream.motes.children.forEach((mote, i) => {
-      mote.userData.t = (mote.userData.t + delta * mote.userData.speed) % 1;
+      mote.userData.t = (mote.userData.t + delta * mote.userData.speed * speedScale) % 1;
       stream.curve.getPointAt(mote.userData.t, mote.position);
       const pulse = 0.6 + Math.sin(time * 3.2 + i + streamIndex) * 0.28;
-      mote.material.opacity = 0.2 + pulse * 0.28;
+      mote.material.opacity = (0.2 + pulse * 0.28) * opacityScale;
       mote.scale.setScalar((0.75 + (i % 5) * 0.12) * (0.8 + pulse * 0.4));
     });
+  });
+}
+
+function updateSceneAtmosphere(time, delta) {
+  const environment = sceneAtmospherics.environments[activeSceneProfile.id];
+  if (!environment || !environment.group.visible) return;
+
+  if (environment.kind === "flow") {
+    environment.streams.forEach((stream, streamIndex) => {
+      stream.line.material.opacity = 0.14 + Math.sin(time * 0.75 + stream.seed) * 0.045;
+      stream.motes.forEach((mote, i) => {
+        mote.userData.t = (mote.userData.t + delta * mote.userData.speed) % 1;
+        stream.curve.getPointAt(mote.userData.t, mote.position);
+        const pulse = 0.65 + Math.sin(time * 3.4 + i * 0.7 + streamIndex) * 0.28;
+        mote.material.opacity = 0.18 + pulse * 0.28;
+        mote.scale.setScalar(mote.userData.scale * (0.82 + pulse * 0.32));
+      });
+    });
+    return;
+  }
+
+  if (environment.kind === "crystal") {
+    environment.crystals.forEach((crystal, index) => {
+      const pulse = 0.5 + Math.sin(time * 1.9 + crystal.userData.phase) * 0.5;
+      crystal.rotation.y += delta * (0.16 + (index % 4) * 0.018);
+      crystal.material.opacity = 0.24 + pulse * 0.34;
+      crystal.scale.y = 0.92 + pulse * 0.16;
+    });
+    environment.glints.forEach((glint, index) => {
+      const pulse = 0.5 + Math.sin(time * 2.7 + glint.userData.phase + index * 0.12) * 0.5;
+      glint.position.y = glint.userData.baseY + Math.sin(time * 0.42 + glint.userData.phase) * 1.4;
+      glint.material.opacity = 0.08 + pulse * 0.45;
+      glint.scale.setScalar(glint.userData.scale * (0.55 + pulse * 0.72));
+    });
+    return;
+  }
+
+  environment.blossoms.forEach((blossom) => {
+    const pulse = 0.5 + Math.sin(time * 1.2 + blossom.userData.phase) * 0.5;
+    blossom.rotation.y += delta * blossom.userData.spin;
+    blossom.position.y = blossom.userData.baseY + Math.sin(time * 0.34 + blossom.userData.phase) * 1.1;
+    blossom.userData.core.material.opacity = 0.14 + pulse * 0.18;
+    blossom.scale.setScalar(blossom.userData.baseScale * (0.86 + pulse * 0.07));
+  });
+  environment.veils.forEach((veil, index) => {
+    veil.position.y = veil.userData.baseY + Math.sin(time * 0.22 + veil.userData.phase) * 2.8;
+    veil.position.x += Math.sin(time * 0.18 + index) * delta * 0.35;
+    veil.rotation.y += delta * veil.userData.drift;
+    veil.material.opacity = 0.04 + Math.sin(time * 0.5 + veil.userData.phase) * 0.018;
+  });
+  environment.motes.forEach((mote, index) => {
+    mote.position.y = mote.userData.baseY + Math.sin(time * 0.44 + mote.userData.phase) * 3.2;
+    mote.position.x += Math.sin(time * 0.3 + index) * delta * 0.42;
+    const pulse = 0.5 + Math.sin(time * 1.7 + mote.userData.phase) * 0.5;
+    mote.material.opacity = 0.1 + pulse * 0.2;
+    mote.scale.setScalar(mote.userData.scale * (0.82 + pulse * 0.34));
   });
 }
 
@@ -8039,7 +8435,7 @@ function updateStorm(time, delta) {
   const biomeGlow = biomeState.current && biomeState.current.id !== "outer" ? biomeState.strength : 0;
   const tidePhase = tideState.phase || tidePhases[0];
   scene.fog.density = THREE.MathUtils.clamp(activeSceneProfile.fogDensity + storm.intensity * 0.006 + biomeGlow * 0.0025 + (tidePhase.fog || 0) * tideState.strength, 0.006, 0.024);
-  bloom.strength = 0.82 + storm.intensity * 0.16 + player.sonarWave * 0.12 + biomeGlow * 0.08 + (tidePhase.bloom || 0) * tideState.strength;
+  bloom.strength = 0.82 + (activeSceneProfile.flow?.bloom || 0) + storm.intensity * 0.16 + player.sonarWave * 0.12 + biomeGlow * 0.08 + (tidePhase.bloom || 0) * tideState.strength;
   stormOverlay.style.opacity = `${storm.intensity * 0.46}`;
 
   stormVeils.veils.forEach((veil, index) => {
