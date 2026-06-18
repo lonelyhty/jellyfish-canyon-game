@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>夜光礁海 - 深海水母漫游</title>
+  <style>
+    html, body, iframe {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      border: 0;
+      background: #010711;
+      display: block;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="gameFrame" title="夜光礁海" allow="autoplay; fullscreen"></iframe>
+  <script>
+    const sessionKey = "jellyfishPortalSession";
+    const serverId = "night-reef";
+    const scene = {
+      serverId,
+      sceneId: serverId,
+      serverName: "二区 · 夜光礁",
+      sceneName: "夜光礁海",
+      region: "华北",
+      depth: 1320,
+      issuedAt: Date.now()
+    };
+    try {
+      const current = JSON.parse(sessionStorage.getItem(sessionKey) || localStorage.getItem(sessionKey) || "{}");
+      const next = { ...current, ...scene };
+      sessionStorage.setItem(sessionKey, JSON.stringify(next));
+      localStorage.setItem(sessionKey, JSON.stringify(next));
+    } catch {}
+    document.querySelector("#gameFrame").src = "./jellyfish-cdn.html?scene=night-reef&server=night-reef";
+  </script>
+</body>
+</html>

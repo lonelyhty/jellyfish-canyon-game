@@ -2376,6 +2376,39 @@ const baseFogColor = new THREE.Color(0x031322);
 const biomeSceneColor = new THREE.Color();
 const biomeFogColor = new THREE.Color();
 const tideVisualColor = new THREE.Color();
+const sceneProfiles = {
+  "blue-rift": {
+    id: "blue-rift",
+    name: "蓝潮裂谷",
+    depth: 938,
+    spawn: new THREE.Vector3(0, -6, 0),
+    background: 0x010711,
+    fog: 0x031322,
+    fogDensity: 0.011,
+    message: "蓝潮裂谷已接入，稳定水层适合开始潜航。"
+  },
+  "night-reef": {
+    id: "night-reef",
+    name: "夜光礁海",
+    depth: 1320,
+    spawn: new THREE.Vector3(-48, -18, 108),
+    background: 0x030817,
+    fog: 0x17123d,
+    fogDensity: 0.013,
+    message: "夜光礁海已接入，晶辉穹顶的声呐回声更加明亮。"
+  },
+  "silent-tide": {
+    id: "silent-tide",
+    name: "静潮深湾",
+    depth: 1760,
+    spawn: new THREE.Vector3(-92, -28, -58),
+    background: 0x021117,
+    fog: 0x06332e,
+    fogDensity: 0.014,
+    message: "静潮深湾已接入，深层海流安静但更幽暗。"
+  }
+};
+let activeSceneProfile = sceneProfiles["blue-rift"];
 
 const camera = new THREE.PerspectiveCamera(56, innerWidth / innerHeight, 0.1, 700);
 camera.position.set(0, 8, 24);
@@ -2604,9 +2637,9 @@ const input = {
   pitch: -0.15
 };
 const serverCatalog = [
-  { id: "blue-rift", name: "一区 · 蓝潮裂谷", region: "华东", ping: 28 },
-  { id: "night-reef", name: "二区 · 夜光礁", region: "华北", ping: 42 },
-  { id: "silent-tide", name: "三区 · 静潮湾", region: "国际", ping: 74 }
+  { id: "blue-rift", name: "一区 · 蓝潮裂谷", region: "华东", sceneId: "blue-rift", sceneName: "蓝潮裂谷", depth: 938, ping: 28 },
+  { id: "night-reef", name: "二区 · 夜光礁", region: "华北", sceneId: "night-reef", sceneName: "夜光礁海", depth: 1320, ping: 42 },
+  { id: "silent-tide", name: "三区 · 静潮湾", region: "国际", sceneId: "silent-tide", sceneName: "静潮深湾", depth: 1760, ping: 74 }
 ];
 const gateway = {
   screen: "login",
@@ -5605,29 +5638,62 @@ function createGatewayServers() {
   });
 }
 
+function sceneProfileFor(id) {
+  return sceneProfiles[id] || sceneProfiles["blue-rift"];
+}
+
+function applySceneProfile(id, movePlayer = true) {
+  const profile = sceneProfileFor(id);
+  activeSceneProfile = profile;
+  baseSceneColor.setHex(profile.background);
+  baseFogColor.setHex(profile.fog);
+  scene.background.copy(baseSceneColor);
+  scene.fog.color.copy(baseFogColor);
+  scene.fog.density = profile.fogDensity;
+  if (movePlayer) {
+    player.group.position.copy(profile.spawn);
+    player.velocity.set(0, 0, 0);
+    player.intent.set(0, 0, 0);
+    remotePlayer.group.position.copy(profile.spawn).add(new THREE.Vector3(8, 2, -6));
+    remotePlayer.velocity.set(0, 0, 0);
+  }
+  return profile;
+}
+
 function readPortalSession() {
-  const sources = [];
+  const session = {};
   try {
     const params = new URLSearchParams(location.search);
     const pilot = params.get("pilot");
     const serverId = params.get("server");
-    if (pilot || serverId) sources.push({ pilot, serverId });
+    const sceneId = params.get("scene") || serverId;
+    if (pilot) session.pilot = pilot;
+    if (serverId) session.serverId = serverId;
+    if (sceneId) session.sceneId = sceneId;
   } catch {}
   try {
     const raw = sessionStorage.getItem("jellyfishPortalSession") || localStorage.getItem("jellyfishPortalSession");
-    if (raw) sources.push(JSON.parse(raw));
+    if (raw) {
+      const stored = JSON.parse(raw);
+      Object.assign(session, stored, {
+        pilot: session.pilot || stored.pilot,
+        serverId: session.serverId || stored.serverId,
+        sceneId: session.sceneId || stored.sceneId || stored.serverId
+      });
+    }
   } catch {}
 
-  const session = sources.find((item) => item && (item.pilot || item.serverId));
-  if (!session) return null;
+  if (!session.pilot && !session.serverId && !session.sceneId) return null;
 
   const issuedAt = Number(session.issuedAt || 0);
   if (issuedAt && Date.now() - issuedAt > 1000 * 60 * 60 * 8) return null;
 
   const pilot = cleanGatewayName(session.pilot, safeGetLocal("jellyfishPilot", "Pilot"));
   const serverId = `${session.serverId || ""}`;
-  const server = gateway.servers.find((item) => item.id === serverId) || gateway.servers[0];
+  const sceneId = `${session.sceneId || serverId || ""}`;
+  const server = gateway.servers.find((item) => item.id === serverId || item.sceneId === sceneId) || gateway.servers[0];
   if (!server || !pilot) return null;
+  const profile = sceneProfileFor(sceneId || server.sceneId || server.id);
 
   const population = Number(session.population);
   const ping = Number(session.ping);
@@ -5635,19 +5701,23 @@ function readPortalSession() {
   if (Number.isFinite(ping)) server.ping = THREE.MathUtils.clamp(Math.round(ping), 18, 128);
   if (session.serverName) server.name = `${session.serverName}`.slice(0, 28);
   if (session.region) server.region = `${session.region}`.slice(0, 12);
+  server.sceneId = profile.id;
+  server.sceneName = profile.name;
+  server.depth = profile.depth;
 
-  return { pilot, server };
+  return { pilot, server, profile };
 }
 
 function applyPortalSession() {
   const session = readPortalSession();
   if (!session) return false;
 
+  const profile = applySceneProfile(session.profile.id);
   gateway.pilot = session.pilot;
   gateway.selectedServerId = session.server.id;
   safeSetLocal("jellyfishPilot", session.pilot);
   pilotName.textContent = `${session.pilot} · 已登录`;
-  pilotRank.textContent = `海渊通行证 · ${session.server.name}`;
+  pilotRank.textContent = `海渊通行证 · ${session.server.name} · ${profile.depth}m`;
   renderServerList();
   updateServerSummary();
 
@@ -5658,7 +5728,7 @@ function applyPortalSession() {
   introPanel.inert = true;
 
   if (mission.type === "upload" && researchState.carried < 1) addResearchSample(2, "Gateway sample");
-  showMessage(`已接入 ${session.server.name}，沿着雷达箭头寻找第一枚荧光孢子。`, 2200);
+  showMessage(`已接入 ${profile.name} · ${profile.depth}m，沿着雷达箭头寻找第一枚荧光孢子。`, 2400);
   return true;
 }
 
@@ -5794,7 +5864,7 @@ function renderServerList() {
     const name = document.createElement("b");
     name.textContent = server.name;
     const region = document.createElement("em");
-    region.textContent = server.region;
+    region.textContent = `${server.region} · ${server.sceneName || sceneProfileFor(server.sceneId || server.id).name}`;
     top.append(name, region);
 
     const load = document.createElement("span");
@@ -5804,7 +5874,7 @@ function renderServerList() {
     const bottom = document.createElement("span");
     bottom.className = "server-card-bottom";
     const population = document.createElement("span");
-    population.textContent = `${server.population.toLocaleString("zh-CN")} 人在线`;
+    population.textContent = `${server.population.toLocaleString("zh-CN")} 人在线 · ${server.depth || sceneProfileFor(server.sceneId || server.id).depth}m`;
     const status = document.createElement("strong");
     status.textContent = state.label;
     bottom.append(population, status);
@@ -5831,7 +5901,8 @@ function updateServerSummary() {
     return;
   }
   const state = getGatewayServerState(server);
-  serverSummary.textContent = `${server.name} · ${state.label} · ${server.population.toLocaleString("zh-CN")} 人在线 · 延迟 ${server.ping}ms`;
+  const profile = sceneProfileFor(server.sceneId || server.id);
+  serverSummary.textContent = `${server.name} · ${profile.name} · ${profile.depth}m · ${state.label} · ${server.population.toLocaleString("zh-CN")} 人在线 · 延迟 ${server.ping}ms`;
   introStart.disabled = gateway.connecting;
 }
 
@@ -6093,8 +6164,10 @@ function startGameFromIntro() {
   }
   setGatewayBusy(true);
   introStart.textContent = "连接中...";
-  setGatewayStatus(`正在连接 ${server.name}...`);
+  const profile = sceneProfileFor(server.sceneId || server.id);
+  setGatewayStatus(`正在连接 ${server.name} · ${profile.name}...`);
   window.setTimeout(() => {
+    applySceneProfile(profile.id);
     player.introOpen = false;
     introPanel.classList.remove("show");
     introPanel.setAttribute("aria-hidden", "true");
@@ -6103,7 +6176,7 @@ function startGameFromIntro() {
     if (mission.type === "upload" && researchState.carried < 1) addResearchSample(2, "委托样本");
     unlockMusic(true);
     playSfx("upgrade", 0.75);
-    showMessage(`已进入 ${server.name}，沿着雷达箭头寻找第一枚荧光孢子。`, 2200);
+    showMessage(`已进入 ${profile.name} · ${profile.depth}m，沿着雷达箭头寻找第一枚荧光孢子。`, 2400);
   }, 620);
 }
 
@@ -7965,7 +8038,7 @@ function updateStorm(time, delta) {
 
   const biomeGlow = biomeState.current && biomeState.current.id !== "outer" ? biomeState.strength : 0;
   const tidePhase = tideState.phase || tidePhases[0];
-  scene.fog.density = THREE.MathUtils.clamp(0.011 + storm.intensity * 0.006 + biomeGlow * 0.0025 + (tidePhase.fog || 0) * tideState.strength, 0.006, 0.024);
+  scene.fog.density = THREE.MathUtils.clamp(activeSceneProfile.fogDensity + storm.intensity * 0.006 + biomeGlow * 0.0025 + (tidePhase.fog || 0) * tideState.strength, 0.006, 0.024);
   bloom.strength = 0.82 + storm.intensity * 0.16 + player.sonarWave * 0.12 + biomeGlow * 0.08 + (tidePhase.bloom || 0) * tideState.strength;
   stormOverlay.style.opacity = `${storm.intensity * 0.46}`;
 
@@ -9141,7 +9214,8 @@ function updateHud(delta) {
       comboText.textContent = player.companions > 0 ? `共生伙伴 ${player.companions}/${player.companionLimit}` : `第 ${player.stage} 潜层`;
     }
   }
-  depthValue.textContent = `${Math.round(900 + Math.max(0, -player.group.position.y) * 7.5)}m`;
+  const sceneDepth = activeSceneProfile.depth + (activeSceneProfile.spawn.y - player.group.position.y) * 7.5;
+  depthValue.textContent = `${Math.round(Math.max(0, sceneDepth))}m`;
   discoveryValue.textContent = `${discoveries.found.size}/${discoveryCatalog.length}`;
   discoveryName.textContent = discoveries.lastName;
   discoveryReadout.classList.toggle("hot", discoveries.pulse > 0.02);

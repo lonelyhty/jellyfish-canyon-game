@@ -478,9 +478,33 @@
     const SERVER_KEY = "jellyfishPreferredServer";
 
     const serverCatalog = [
-      { id: "blue-rift", name: "一区 · 蓝潮裂谷", region: "华东", basePing: 28 },
-      { id: "night-reef", name: "二区 · 夜光礁", region: "华北", basePing: 42 },
-      { id: "silent-tide", name: "三区 · 静潮湾", region: "国际", basePing: 74 }
+      {
+        id: "blue-rift",
+        name: "一区 · 蓝潮裂谷",
+        region: "华东",
+        sceneName: "蓝潮裂谷",
+        depth: 938,
+        scenePath: "./blue-rift.html",
+        basePing: 28
+      },
+      {
+        id: "night-reef",
+        name: "二区 · 夜光礁",
+        region: "华北",
+        sceneName: "夜光礁海",
+        depth: 1320,
+        scenePath: "./night-reef.html",
+        basePing: 42
+      },
+      {
+        id: "silent-tide",
+        name: "三区 · 静潮湾",
+        region: "国际",
+        sceneName: "静潮深湾",
+        depth: 1760,
+        scenePath: "./silent-tide.html",
+        basePing: 74
+      }
     ];
 
     const state = {
@@ -611,9 +635,9 @@
         button.style.setProperty("--load", serverState.load.toFixed(3));
         button.setAttribute("aria-pressed", `${server.id === state.selectedServerId}`);
         button.innerHTML = `
-          <span class="server-top"><b>${server.name}</b><em>${server.region}</em></span>
+          <span class="server-top"><b>${server.name}</b><em>${server.region} · ${server.sceneName}</em></span>
           <span class="load"><i></i></span>
-          <span class="server-bottom"><span>${server.population} 人在线</span><strong>${serverState.label}</strong></span>
+          <span class="server-bottom"><span>${server.population} 人在线 · ${server.depth}m</span><strong>${serverState.label}</strong></span>
         `;
         button.addEventListener("click", () => {
           state.selectedServerId = server.id;
@@ -633,7 +657,7 @@
     function updateSummary() {
       const server = getSelectedServer();
       const serverState = getServerState(server);
-      summary.textContent = `${server.name} · ${serverState.label} · ${server.population} 人在线 · 延迟 ${server.ping}ms`;
+      summary.textContent = `${server.name} · ${server.sceneName} · ${server.depth}m · ${serverState.label} · ${server.population} 人在线 · 延迟 ${server.ping}ms`;
       enterButton.disabled = !server;
     }
 
@@ -658,6 +682,10 @@
         pilot: state.pilot,
         serverId: server.id,
         serverName: server.name,
+        sceneId: server.id,
+        sceneName: server.sceneName,
+        scenePath: server.scenePath,
+        depth: server.depth,
         region: server.region,
         population: server.population,
         ping: server.ping,
@@ -669,9 +697,9 @@
       localStorage.setItem(SERVER_KEY, server.id);
       enterButton.disabled = true;
       enterButton.textContent = "连接中...";
-      setStatus(`正在连接 ${server.name}...`);
+      setStatus(`正在连接 ${server.name} · ${server.sceneName}...`);
       window.setTimeout(() => {
-        window.location.href = "./jellyfish-cdn.html";
+        window.location.href = server.scenePath;
       }, 360);
     }
 
