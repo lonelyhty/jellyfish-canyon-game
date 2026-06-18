@@ -412,16 +412,16 @@
       <div class="panel-head">
         <div>
           <h2>海渊通行证</h2>
-          <p id="status" class="status">登录或注册一个本地通行证。</p>
+          <p id="status" class="status">创建新的本地通行证。</p>
         </div>
       </div>
 
       <div id="tabs" class="tabs" role="tablist">
-        <button id="loginTab" class="tab is-active" type="button" role="tab" aria-selected="true">登录</button>
-        <button id="registerTab" class="tab" type="button" role="tab" aria-selected="false">注册</button>
+        <button id="loginTab" class="tab" type="button" role="tab" aria-selected="false">登录</button>
+        <button id="registerTab" class="tab is-active" type="button" role="tab" aria-selected="true">注册</button>
       </div>
 
-      <form id="loginView" class="view is-active" autocomplete="on">
+      <form id="loginView" class="view" autocomplete="on">
         <label>
           通行证或昵称
           <input id="loginName" type="text" maxlength="18" autocomplete="username" placeholder="输入昵称">
@@ -437,7 +437,7 @@
         <div class="notice">这是单机游戏的拟真入口，账号和服务器状态只保存在本机浏览器里。</div>
       </form>
 
-      <form id="registerView" class="view">
+      <form id="registerView" class="view is-active">
         <label>
           昵称
           <input id="registerName" type="text" maxlength="14" autocomplete="nickname" placeholder="水母指挥官">
@@ -484,7 +484,7 @@
     ];
 
     const state = {
-      screen: "login",
+      screen: "register",
       pilot: localStorage.getItem(PILOT_KEY) || "",
       selectedServerId: localStorage.getItem(SERVER_KEY) || "blue-rift",
       servers: createServers()
@@ -510,7 +510,7 @@
 
     loginName.value = state.pilot;
     renderServers();
-    setStatus(state.pilot ? `欢迎回来，${state.pilot}。` : "登录或注册一个本地通行证。");
+    setStatus("创建新的本地通行证。已有账号可以切到登录。");
 
     function createServers() {
       return serverCatalog.map((server) => ({
