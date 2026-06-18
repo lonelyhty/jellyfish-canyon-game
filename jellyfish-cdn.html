@@ -2402,7 +2402,7 @@ const tuning = { comboWindow: 7.2, maxCombo: 9 };
 const storm = { intensity: 0, target: 0, timer: 24, duration: 0, drift: new THREE.Vector3(), seed: Math.random() * 100 };
 const mission = { index: -1, title: "", type: "", progress: 0, target: 1, timer: 0, reward: 0 };
 const leviathanState = { active: false, timer: 42, duration: 0, health: 0, maxHealth: 100, stun: 0, phase: 0, warning: 0 };
-const discoveries = { found: new Set(), lastName: "声呐图鉴", pulse: 0, panelOpen: false, rank: 0 };
+const discoveries = { found: loadDiscoverySet(), lastName: "声呐图鉴", pulse: 0, panelOpen: false, rank: 0 };
 let discoveryCatalog = [];
 const biomeState = { current: null, target: null, strength: 0, entered: new Set(), pulse: 0 };
 const relicState = { completed: 0, pulse: 0 };
@@ -2543,6 +2543,7 @@ const performanceState = {
   frame: 0,
   hitch: 0,
   quality: 1,
+  effectLoad: 0,
   hudCooldown: 0,
   pixelRatio: basePixelRatio,
   pixelTimer: 0
@@ -2570,11 +2571,22 @@ const scannerState = {
   targetFrame: -1,
   target: null,
   guideFrame: -1,
-  guideTarget: null
+  guideTarget: null,
+  lockTarget: null,
+  lockFilterId: "",
+  lockTimer: 0,
+  lockDistance: Infinity,
+  lockPulse: 0
 };
 const codexRouteState = {
   pinnedId: safeGetLocal("jellyfishPinnedCodex", ""),
-  pulse: 0
+  pulse: 0,
+  targetFrame: -1,
+  target: null,
+  distance: Infinity,
+  arrivalId: "",
+  rewardCooldown: 0,
+  chain: safeGetNumber("jellyfishCodexRouteChain", 0)
 };
 const beaconState = {
   charges: safeGetNumber("jellyfishBeaconCharges", 1),
@@ -2849,6 +2861,7 @@ const speedLineDirection = new THREE.Vector3();
 const speedLineSide = new THREE.Vector3();
 const speedLineLift = new THREE.Vector3();
 const audibleTarget = { position: null, range: 0, weight: 0, distance: Infinity };
+const audibleQueryState = { frame: -10, target: null };
 const codexRouteTarget = { group: { position: new THREE.Vector3() } };
 const forward = new THREE.Vector3();
 const right = new THREE.Vector3();
@@ -2960,15 +2973,17 @@ const researchBeacons = createResearchBeacons(4);
 scene.add(researchBeacons.group);
 
 discoveryCatalog = createDiscoveryCatalog();
+reconcileStoredDiscoveries();
 
 createRadarDots();
 const radarMarkers = createRadarMarkers();
 setupGateway();
 bindInput();
 updateScoreReadout();
+applyResearchRewards(true);
 applyFabricatorRewards(true);
 startMission();
-showMessage("沿着荧光流穿过裂谷，连收孢子来唤醒海心。", 2600);
+if (!applyPortalSession()) showMessage("沿着荧光流穿过裂谷，连收孢子来唤醒海心。", 2600);
 
 let lastTime = performance.now() / 1000;
 let elapsed = 0;
@@ -4641,8 +4656,18 @@ function deployResearchBeacon() {
     beaconState.pulse = 0.5;
     return false;
   }
-  const beacon = researchBeacons.items.find((item) => !item.active)
-    || researchBeacons.items.sort((a, b) => a.timer - b.timer)[0];
+  let beacon = null;
+  let shortestTimer = Infinity;
+  for (const item of researchBeacons.items) {
+    if (!item.active) {
+      beacon = item;
+      break;
+    }
+    if (item.timer < shortestTimer) {
+      shortestTimer = item.timer;
+      beacon = item;
+    }
+  }
   if (!beacon) return false;
   beacon.active = true;
   beacon.timer = 46 + Math.min(18, researchState.banked * 0.4) + (player.upgrades.beaconReserve || 0) * 8;
@@ -5304,6 +5329,18 @@ function safeGetLocal(key, fallback = "") {
   }
 }
 
+function loadDiscoverySet() {
+  const raw = safeGetLocal("jellyfishDiscoveries", "");
+  if (!raw) return new Set();
+  try {
+    const ids = JSON.parse(raw);
+    if (Array.isArray(ids)) return new Set(ids.filter((id) => typeof id === "string" && id.length > 0));
+  } catch (error) {
+    // Older local builds used simple delimited values while the prototype was moving fast.
+  }
+  return new Set(raw.split(",").map((id) => id.trim()).filter(Boolean));
+}
+
 function safeGetNumber(key, fallback = 0) {
   const value = Number(safeGetLocal(key, `${fallback}`));
   return Number.isFinite(value) ? value : fallback;
@@ -5315,6 +5352,22 @@ function safeSetLocal(key, value) {
   } catch (error) {
     // Local storage may be unavailable in strict browser contexts.
   }
+}
+
+function persistDiscoveries() {
+  safeSetLocal("jellyfishDiscoveries", JSON.stringify([...discoveries.found]));
+}
+
+function reconcileStoredDiscoveries() {
+  let changed = false;
+  discoveries.found.forEach((id) => {
+    if (discoveryCatalog.some((entry) => entry.id === id)) return;
+    discoveries.found.delete(id);
+    changed = true;
+  });
+  if (changed) persistDiscoveries();
+  if (discoveries.found.size > 0) discoveries.lastName = "已同步图鉴";
+  if (codexRouteState.pinnedId && discoveries.found.has(codexRouteState.pinnedId)) clearCodexRoute();
 }
 
 function currentScannerFilter() {
@@ -5330,13 +5383,72 @@ function scannerFilterIs(id) {
   return currentScannerFilter().id === id;
 }
 
+function invalidateScannerTargets(clearLock = false) {
+  scannerState.targetFrame = -1;
+  scannerState.target = null;
+  scannerState.guideFrame = -1;
+  scannerState.guideTarget = null;
+  if (!clearLock) return;
+  scannerState.lockTarget = null;
+  scannerState.lockFilterId = "";
+  scannerState.lockTimer = 0;
+  scannerState.lockDistance = Infinity;
+  scannerState.lockPulse = 0;
+}
+
+function targetPosition(target) {
+  if (!target) return null;
+  if (target.group?.position) return target.group.position;
+  if (target.position) return target.position;
+  return null;
+}
+
+function isScannerLockValid(target, filterId = scannerState.lockFilterId) {
+  if (!target || !filterId || filterId === "auto") return false;
+  if (target.collected || target.stabilized) return false;
+  if (Object.prototype.hasOwnProperty.call(target, "active") && !target.active) return false;
+  if (target === mythicLife) return mythicLife.active;
+  if (!targetPosition(target)) return false;
+  if (filterId === "pearl" && target.variant && target.variant !== "pearl" && scannerState.lockTimer > 8) return false;
+  return true;
+}
+
+function refreshScannerLock(reason = "scan") {
+  const filter = currentScannerFilter();
+  if (filter.id === "auto") return false;
+  const target = scannerFilteredTarget(true);
+  if (!isScannerLockValid(target, filter.id)) return false;
+  scannerState.lockTarget = target;
+  scannerState.lockFilterId = filter.id;
+  scannerState.lockTimer = reason === "sonar" ? 24 : 16;
+  scannerState.lockPulse = 1;
+  scannerState.lockDistance = targetPosition(target).distanceTo(player.group.position);
+  scannerState.pulse = 1;
+  scannerState.guideFrame = -1;
+  return true;
+}
+
+function updateScannerLock(delta) {
+  scannerState.lockPulse = Math.max(0, scannerState.lockPulse - delta * 1.5);
+  if (scannerState.lockTimer <= 0) return;
+  scannerState.lockTimer = Math.max(0, scannerState.lockTimer - delta);
+  if (!isScannerLockValid(scannerState.lockTarget)) {
+    invalidateScannerTargets(true);
+    return;
+  }
+  const position = targetPosition(scannerState.lockTarget);
+  scannerState.lockDistance = position ? position.distanceTo(player.group.position) : Infinity;
+  if (scannerState.lockDistance < player.upgrades.collectionReach + 1.4) {
+    scannerState.lockTimer = Math.min(scannerState.lockTimer, 3.5);
+  }
+}
+
 function cycleScannerFilter(direction = 1) {
   if (player.introOpen || player.upgradeOpen) return;
   scannerState.index = (scannerState.index + direction + scannerFilters.length) % scannerFilters.length;
   scannerState.focus = 0;
   scannerState.pulse = 1;
-  scannerState.targetFrame = -1;
-  scannerState.guideFrame = -1;
+  invalidateScannerTargets(true);
   const filter = currentScannerFilter();
   safeSetLocal("jellyfishScannerFilter", `${scannerState.index}`);
   playSfx("click", 0.78);
@@ -5349,6 +5461,7 @@ function reportScannerFocus(type, position, label = "目标") {
   if (player.introOpen || filter.id === "auto" || filter.id !== type) return false;
   scannerState.focus = Math.min(3, scannerState.focus + 1);
   scannerState.pulse = 1;
+  refreshScannerLock("focus");
   if (scannerState.focus < 3) {
     comboText.textContent = `扫描专注 ${scannerState.focus}/3：${label}`;
     return true;
@@ -5399,32 +5512,81 @@ function pinnedCodexEntry() {
   return discoveryCatalog.find((entry) => entry.id === codexRouteState.pinnedId) || null;
 }
 
+function resetCodexRouteTarget() {
+  codexRouteState.targetFrame = -1;
+  codexRouteState.target = null;
+  codexRouteState.distance = Infinity;
+  codexRouteState.arrivalId = "";
+  scannerState.guideFrame = -1;
+}
+
+function setCodexRouteEntry(entry) {
+  const filterId = codexEntryScannerFilter(entry);
+  scannerState.index = scannerFilterIndex(filterId);
+  scannerState.focus = 0;
+  scannerState.pulse = 1;
+  invalidateScannerTargets(true);
+  codexRouteState.pinnedId = entry.id;
+  codexRouteState.pulse = 1;
+  resetCodexRouteTarget();
+  safeSetLocal("jellyfishScannerFilter", `${scannerState.index}`);
+  safeSetLocal("jellyfishPinnedCodex", entry.id);
+  return currentScannerFilter();
+}
+
+function clearCodexRoute() {
+  codexRouteState.pinnedId = "";
+  codexRouteState.pulse = 1;
+  resetCodexRouteTarget();
+  safeSetLocal("jellyfishPinnedCodex", "");
+}
+
+function nextCodexRouteEntry(originEntry) {
+  let bestEntry = null;
+  let bestScore = Infinity;
+  const originFilter = codexEntryScannerFilter(originEntry);
+  discoveryCatalog.forEach((entry) => {
+    if (entry.id === originEntry.id || discoveries.found.has(entry.id)) return;
+    let nearest = Infinity;
+    entry.visit((position) => {
+      const distance = position.distanceToSquared(player.group.position);
+      if (distance < nearest) nearest = distance;
+    });
+    if (!Number.isFinite(nearest)) return;
+    const distance = Math.sqrt(nearest);
+    const filterPenalty = codexEntryScannerFilter(entry) === originFilter ? 0 : 34;
+    const valueBias = Math.min(72, entry.points * 0.11);
+    const score = distance + filterPenalty - valueBias;
+    if (score < bestScore) {
+      bestScore = score;
+      bestEntry = entry;
+    }
+  });
+  return bestEntry;
+}
+
+function continueCodexRouteAfter(entry) {
+  const nextEntry = nextCodexRouteEntry(entry);
+  if (!nextEntry) return false;
+  const filter = setCodexRouteEntry(nextEntry);
+  comboText.textContent = `路线续接：${nextEntry.name}`;
+  showMessage(`路线链 ${codexRouteState.chain} 续接：${nextEntry.name} · ${filter.name}扫描`, 1550);
+  return true;
+}
+
 function pinCodexRoute(id) {
   const entry = discoveryCatalog.find((item) => item.id === id);
   if (!entry) return false;
 
   if (codexRouteState.pinnedId === id) {
-    codexRouteState.pinnedId = "";
-    codexRouteState.pulse = 1;
-    safeSetLocal("jellyfishPinnedCodex", "");
+    clearCodexRoute();
     showMessage("图鉴路线已清除。", 950);
     playSfx("click", 0.54);
     if (discoveries.panelOpen) renderCodexPanel();
     return true;
   }
 
-  const filterId = codexEntryScannerFilter(entry);
-  const index = scannerFilterIndex(filterId);
-  scannerState.index = index;
-  scannerState.focus = 0;
-  scannerState.pulse = 1;
-  scannerState.targetFrame = -1;
-  scannerState.guideFrame = -1;
-  codexRouteState.pinnedId = id;
-  codexRouteState.pulse = 1;
-  safeSetLocal("jellyfishScannerFilter", `${scannerState.index}`);
-  safeSetLocal("jellyfishPinnedCodex", id);
-  const filter = currentScannerFilter();
+  const filter = setCodexRouteEntry(entry);
   showMessage(`图鉴路线：${entry.name} · ${filter.name}扫描`, 1250);
   comboText.textContent = `路线钉选：${entry.name}`;
   playSfx("pulse", 0.56);
@@ -5441,6 +5603,63 @@ function createGatewayServers() {
       ping: server.ping + THREE.MathUtils.randInt(-6, 9)
     };
   });
+}
+
+function readPortalSession() {
+  const sources = [];
+  try {
+    const params = new URLSearchParams(location.search);
+    const pilot = params.get("pilot");
+    const serverId = params.get("server");
+    if (pilot || serverId) sources.push({ pilot, serverId });
+  } catch {}
+  try {
+    const raw = sessionStorage.getItem("jellyfishPortalSession") || localStorage.getItem("jellyfishPortalSession");
+    if (raw) sources.push(JSON.parse(raw));
+  } catch {}
+
+  const session = sources.find((item) => item && (item.pilot || item.serverId));
+  if (!session) return null;
+
+  const issuedAt = Number(session.issuedAt || 0);
+  if (issuedAt && Date.now() - issuedAt > 1000 * 60 * 60 * 8) return null;
+
+  const pilot = cleanGatewayName(session.pilot, safeGetLocal("jellyfishPilot", "Pilot"));
+  const serverId = `${session.serverId || ""}`;
+  const server = gateway.servers.find((item) => item.id === serverId) || gateway.servers[0];
+  if (!server || !pilot) return null;
+
+  const population = Number(session.population);
+  const ping = Number(session.ping);
+  if (Number.isFinite(population)) server.population = THREE.MathUtils.clamp(Math.round(population), 0, 40);
+  if (Number.isFinite(ping)) server.ping = THREE.MathUtils.clamp(Math.round(ping), 18, 128);
+  if (session.serverName) server.name = `${session.serverName}`.slice(0, 28);
+  if (session.region) server.region = `${session.region}`.slice(0, 12);
+
+  return { pilot, server };
+}
+
+function applyPortalSession() {
+  const session = readPortalSession();
+  if (!session) return false;
+
+  gateway.pilot = session.pilot;
+  gateway.selectedServerId = session.server.id;
+  safeSetLocal("jellyfishPilot", session.pilot);
+  pilotName.textContent = `${session.pilot} · 已登录`;
+  pilotRank.textContent = `海渊通行证 · ${session.server.name}`;
+  renderServerList();
+  updateServerSummary();
+
+  player.introOpen = false;
+  introPanel.classList.remove("show");
+  introPanel.setAttribute("aria-hidden", "true");
+  introPanel.hidden = true;
+  introPanel.inert = true;
+
+  if (mission.type === "upload" && researchState.carried < 1) addResearchSample(2, "Gateway sample");
+  showMessage(`已接入 ${session.server.name}，沿着雷达箭头寻找第一枚荧光孢子。`, 2200);
+  return true;
 }
 
 function setupGateway() {
@@ -6235,7 +6454,7 @@ function updateProximitySound(delta) {
   if (!music.enabled || !music.context) return;
   music.proximityTimer = Math.max(0, music.proximityTimer - delta);
   if (music.proximityTimer > 0) return;
-  const target = nearestAudibleObject();
+  const target = nearestAudibleObject(true);
   if (!target) return;
   const distance = target.position.distanceTo(player.group.position);
   if (distance > target.range) return;
@@ -6244,7 +6463,10 @@ function updateProximitySound(delta) {
   music.proximityTimer = THREE.MathUtils.lerp(2.8, 0.75, intensity);
 }
 
-function nearestAudibleObject() {
+function nearestAudibleObject(force = false) {
+  const refreshGap = performanceState.hitch > 0.35 ? 3 : 1;
+  if (!force && performanceState.frame - audibleQueryState.frame < refreshGap) return audibleQueryState.target;
+  audibleQueryState.frame = performanceState.frame;
   let found = false;
   let best = Infinity;
   const consider = (position, range, weight = 1) => {
@@ -6275,7 +6497,8 @@ function nearestAudibleObject() {
   });
   if (mythicLife.active) consider(mythicLife.group.position, 72, 1.25);
   if (player.gateOpened) consider(heartGate.group.position, 42, 0.85);
-  return found ? audibleTarget : null;
+  audibleQueryState.target = found ? audibleTarget : null;
+  return audibleQueryState.target;
 }
 
 function createDiscoveryCatalog() {
@@ -6441,13 +6664,14 @@ function scanDiscoveries(range) {
 }
 
 function unlockDiscovery(entry, position) {
+  const routedArchive = codexRouteState.pinnedId === entry.id;
   discoveries.found.add(entry.id);
+  persistDiscoveries();
   discoveries.lastName = entry.name;
   discoveries.pulse = 1;
-  if (codexRouteState.pinnedId === entry.id) {
-    codexRouteState.pinnedId = "";
-    codexRouteState.pulse = 1;
-    safeSetLocal("jellyfishPinnedCodex", "");
+  if (routedArchive) {
+    rewardCodexRouteArchive(entry, position);
+    clearCodexRoute();
   }
   awardScore(entry.points, `发现 ${entry.name}`);
   reportMission("discover", 1);
@@ -6455,7 +6679,8 @@ function unlockDiscovery(entry, position) {
   addResearchSample(entry.id === "mythic-jelly" ? 4 : 1, entry.name);
   playSfx("discover", 0.9);
   burstImpact(position, { count: 18, scale: 1.05, energy: 0.82, spread: 0.95, color: entry.color });
-  showMessage(`声呐记录：${entry.name}`, 1200);
+  if (routedArchive) continueCodexRouteAfter(entry);
+  else showMessage(`声呐记录：${entry.name}`, 1200);
   applyResearchRewards();
   if (discoveries.panelOpen) renderCodexPanel();
 }
@@ -6584,7 +6809,7 @@ function applyFabricatorRewards(silent = false) {
   });
 }
 
-function applyResearchRewards() {
+function applyResearchRewards(silent = false) {
   const count = discoveries.found.size;
   const rewards = [
     {
@@ -6620,6 +6845,7 @@ function applyResearchRewards() {
     if (count < reward.threshold || discoveries.rank >= reward.rank) return;
     reward.apply();
     discoveries.rank = reward.rank;
+    if (silent) return;
     awardScore(180 * reward.rank, reward.text);
     playSfx("upgrade", 0.86);
     showMessage(reward.text, 1500);
@@ -6674,6 +6900,10 @@ function codexEntryClue(entry, found, pinned = false) {
 }
 
 function currentCodexRouteTarget() {
+  if (codexRouteState.targetFrame === performanceState.frame) return codexRouteState.target;
+  codexRouteState.targetFrame = performanceState.frame;
+  codexRouteState.target = null;
+  codexRouteState.distance = Infinity;
   const entry = pinnedCodexEntry();
   if (!entry || discoveries.found.has(entry.id)) return null;
   let nearest = Infinity;
@@ -6687,7 +6917,60 @@ function currentCodexRouteTarget() {
   });
   if (!nearestPosition) return null;
   codexRouteTarget.group.position.copy(nearestPosition);
-  return codexRouteTarget;
+  codexRouteState.distance = Math.sqrt(nearest);
+  codexRouteState.target = codexRouteTarget;
+  return codexRouteState.target;
+}
+
+function updateCodexRoute(delta) {
+  codexRouteState.rewardCooldown = Math.max(0, codexRouteState.rewardCooldown - delta);
+  const entry = pinnedCodexEntry();
+  if (!entry || discoveries.found.has(entry.id)) return;
+  const target = currentCodexRouteTarget();
+  if (!target || !Number.isFinite(codexRouteState.distance)) return;
+  const approachRange = Math.max(10, Math.min(entry.range * 0.42, player.upgrades.echoRange * 0.52));
+  if (codexRouteState.distance > approachRange || codexRouteState.arrivalId === entry.id || codexRouteState.rewardCooldown > 0) return;
+
+  codexRouteState.arrivalId = entry.id;
+  codexRouteState.rewardCooldown = 6.5;
+  codexRouteState.pulse = 1;
+  scannerState.pulse = 1;
+  const bonus = Math.round(70 + player.stage * 18 + entry.points * 0.18);
+  player.score += bonus;
+  updateScoreReadout();
+  player.sonarCooldown = Math.max(0, player.sonarCooldown - 1.1);
+  chartState.progress = Math.min(chartState.target, chartState.progress + 0.18 + chartState.bonus * 0.12);
+  chartState.pulse = Math.max(chartState.pulse, 0.5);
+  playSfx("discover", 0.45);
+  burstImpact(target.group.position, { count: 8, scale: 0.74, energy: 0.42, spread: 0.72, color: entry.color });
+  showMessage(`图鉴路线接近：${entry.name}，按 R 归档。+${bonus}`, 1250);
+}
+
+function rewardCodexRouteArchive(entry, position) {
+  codexRouteState.chain += 1;
+  codexRouteState.pulse = 1;
+  safeSetLocal("jellyfishCodexRouteChain", `${codexRouteState.chain}`);
+  const sampleBonus = codexRouteState.chain % 2 === 0 ? 2 : 1;
+  const scoreBonus = Math.round(95 + entry.points * 0.32 + codexRouteState.chain * 24);
+  awardScore(scoreBonus, `路线归档 ${codexRouteState.chain}`);
+  addResearchSample(sampleBonus, "图鉴路线");
+  chartState.progress = Math.min(chartState.target, chartState.progress + 0.25 + chartState.bonus * 0.14);
+  chartState.pulse = 1;
+  let extra = `样本 +${sampleBonus}`;
+  if (codexRouteState.chain % 3 === 0) {
+    if (beaconState.charges < beaconChargeLimit()) {
+      beaconState.charges += 1;
+      beaconState.pulse = 1;
+      safeSetLocal("jellyfishBeaconCharges", `${beaconState.charges}`);
+      extra += "，信标 +1";
+    } else {
+      echoState.heat = Math.max(0, echoState.heat - 0.04);
+      pearlState.strain = Math.max(0, pearlState.strain - 0.03);
+      extra += "，回声稳定";
+    }
+  }
+  burstImpact(position, { count: 12, scale: 0.86, energy: 0.58, spread: 0.84, color: entry.color });
+  showMessage(`路线链 ${codexRouteState.chain}：${entry.name} 已归档，${extra}。`, 1500);
 }
 
 function spawnEchoWave(range, layer = 0) {
@@ -6756,6 +7039,7 @@ function triggerSonar() {
   const relicScan = scanEchoRelics(range);
   const anomalyScan = scanEchoAnomalies(range);
   const cacheScan = scanSalvageCaches(range);
+  const scannerLocked = refreshScannerLock("sonar");
   let mythicScanned = false;
   if (mythicLife.active) {
     const distance = mythicLife.group.position.distanceTo(player.group.position);
@@ -6778,6 +7062,7 @@ function triggerSonar() {
   if (relicScan.hits > 0) comboText.textContent = relicScan.charged > 0 ? "遗迹谐振就绪" : `遗迹回声 +${relicScan.hits}`;
   if (anomalyScan.hits > 0) comboText.textContent = anomalyScan.charged > 0 ? "危险回声可封存" : `危险回声 +${anomalyScan.hits}`;
   if (cacheScan.hits > 0) comboText.textContent = cacheScan.openable > 0 ? "货舱可脉冲开启" : `货舱信号 +${cacheScan.hits}`;
+  if (scannerLocked) comboText.textContent = `扫描锁定：${currentScannerFilter().name}`;
   if (mythicScanned) comboText.textContent = "星冠水母已归档";
   addTrailBurst(7, 1.08);
   burstImpact(player.group.position, { count: 24, scale: 1.0, energy: 1.05, spread: 1.25, color: 0x9ffbff });
@@ -6943,10 +7228,33 @@ function updatePearlStrain(delta) {
 function ensureAbyssPearl() {
   const existing = spores.find((spore) => !spore.collected && spore.variant === "pearl");
   if (existing) return existing;
-  const candidates = spores
-    .filter((spore) => !spore.collected)
-    .sort((a, b) => a.group.position.distanceToSquared(player.group.position) - b.group.position.distanceToSquared(player.group.position));
-  const spore = candidates[Math.min(2, candidates.length - 1)];
+  let first = null;
+  let second = null;
+  let third = null;
+  let firstDistance = Infinity;
+  let secondDistance = Infinity;
+  let thirdDistance = Infinity;
+  spores.forEach((spore) => {
+    if (spore.collected) return;
+    const distance = spore.group.position.distanceToSquared(player.group.position);
+    if (distance < firstDistance) {
+      third = second;
+      thirdDistance = secondDistance;
+      second = first;
+      secondDistance = firstDistance;
+      first = spore;
+      firstDistance = distance;
+    } else if (distance < secondDistance) {
+      third = second;
+      thirdDistance = secondDistance;
+      second = spore;
+      secondDistance = distance;
+    } else if (distance < thirdDistance) {
+      third = spore;
+      thirdDistance = distance;
+    }
+  });
+  const spore = third || second || first;
   if (!spore) return null;
   const angle = input.yaw + THREE.MathUtils.randFloat(-0.72, 0.72);
   const radius = THREE.MathUtils.randFloat(44, 66);
@@ -6996,12 +7304,20 @@ function updateEchoPressure(delta, time) {
 }
 
 function spawnEchoAnomaly(reason = "pressure", force = false) {
-  const activeCount = echoAnomalies.items.filter((anomaly) => anomaly.active).length;
+  let activeCount = 0;
+  let anomaly = null;
+  let shortestCooldown = Infinity;
+  echoAnomalies.items.forEach((item) => {
+    if (item.active) {
+      activeCount += 1;
+      return;
+    }
+    if (item.cooldown < shortestCooldown) {
+      shortestCooldown = item.cooldown;
+      anomaly = item;
+    }
+  });
   if (!force && activeCount >= 2 + Math.floor(echoState.heat * 2)) return null;
-  const candidates = echoAnomalies.items
-    .filter((anomaly) => !anomaly.active)
-    .sort((a, b) => a.cooldown - b.cooldown);
-  const anomaly = candidates[0];
   if (!anomaly || (!force && anomaly.cooldown > 0)) return null;
   placeEchoAnomaly(anomaly, reason);
   if (anomaly.revealed && !player.introOpen) {
@@ -7205,6 +7521,17 @@ function performanceEffectScale() {
   return 1;
 }
 
+function reserveEffectCount(requestedCount) {
+  if (requestedCount <= 0) return 0;
+  const scaledCount = Math.max(1, Math.round(requestedCount * performanceEffectScale()));
+  const budget = performanceState.hitch > 0.55 ? 38 : performanceState.hitch > 0.25 ? 52 : 72;
+  const remaining = Math.max(0, budget - performanceState.effectLoad);
+  if (remaining <= 0) return 0;
+  const count = Math.min(scaledCount, remaining);
+  performanceState.effectLoad += count;
+  return count;
+}
+
 function targetRenderPixelRatio() {
   const floor = innerWidth < 760 ? 0.88 : 1;
   if (performanceState.hitch > 0.7) return Math.max(floor, basePixelRatio * 0.72);
@@ -7222,6 +7549,7 @@ function applyRenderPixelRatio(ratio) {
 
 function updatePerformanceSmoothing(rawDelta) {
   performanceState.frame += 1;
+  performanceState.effectLoad = 0;
   performanceState.hitch = Math.max(0, performanceState.hitch - rawDelta * 0.5);
   if (rawDelta > 0.058) {
     performanceState.hitch = Math.min(1, performanceState.hitch + (rawDelta - 0.04) * 6);
@@ -7285,7 +7613,9 @@ function update(delta, time) {
   updateSpeedLines(delta, time);
   updateEchoWaves(delta);
   updateCompanions(time, delta);
+  updateScannerLock(delta);
   updateGuideLine(time);
+  updateCodexRoute(delta);
   updateInteractionFocus(time, delta);
   updateCamera(delta);
   updateHud(delta);
@@ -8240,8 +8570,18 @@ function awardScore(base, label) {
 }
 
 function startMission(forcedType) {
-  const pool = forcedType ? missionCatalog.filter((item) => item.type === forcedType) : missionCatalog;
-  const next = pool[Math.floor(Math.random() * pool.length)] || missionCatalog[0];
+  let next = null;
+  if (forcedType) {
+    let matches = 0;
+    missionCatalog.forEach((item) => {
+      if (item.type !== forcedType) return;
+      matches += 1;
+      if (Math.random() < 1 / matches) next = item;
+    });
+  } else {
+    next = missionCatalog[Math.floor(Math.random() * missionCatalog.length)];
+  }
+  next = next || missionCatalog[0];
   mission.index += 1;
   mission.title = next.title;
   mission.type = next.type;
@@ -8345,9 +8685,11 @@ function completeStage() {
 function offerUpgradeChoices() {
   if (player.upgradeOpen) return;
   player.upgradeOpen = true;
-  const options = [...upgradeCatalog]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3);
+  const options = [];
+  while (options.length < 3 && options.length < upgradeCatalog.length) {
+    const upgrade = upgradeCatalog[THREE.MathUtils.randInt(0, upgradeCatalog.length - 1)];
+    if (!options.includes(upgrade)) options.push(upgrade);
+  }
   upgradeOptions.innerHTML = "";
   options.forEach((upgrade) => {
     const button = document.createElement("button");
@@ -8753,6 +9095,17 @@ function currentEchoBand() {
   return { name: "回声暴鸣", trait: "幽影诱发", color: 0xff6f8f };
 }
 
+function codexRouteHudText() {
+  if (!codexRouteState.pinnedId) return "";
+  currentCodexRouteTarget();
+  if (!Number.isFinite(codexRouteState.distance)) return "路线无信号";
+  const entry = pinnedCodexEntry();
+  const scanRange = entry ? Math.max(player.upgrades.echoRange, entry.range) : player.upgrades.echoRange;
+  if (codexRouteState.distance <= scanRange) return "按 R 归档";
+  const chain = codexRouteState.chain > 0 ? ` · 链${codexRouteState.chain}` : "";
+  return `路线 ${Math.round(codexRouteState.distance)}m${chain}`;
+}
+
 function updateHud(delta) {
   discoveries.pulse = Math.max(0, discoveries.pulse - delta * 1.68);
   scannerState.pulse = Math.max(0, scannerState.pulse - delta * 1.68);
@@ -8794,14 +9147,23 @@ function updateHud(delta) {
   discoveryReadout.classList.toggle("hot", discoveries.pulse > 0.02);
   const scannerFilter = currentScannerFilter();
   const scannerTarget = scannerFilteredTarget();
+  const routeText = codexRouteHudText();
+  const lockActive = scannerState.lockTimer > 0
+    && scannerState.lockFilterId === scannerFilter.id
+    && isScannerLockValid(scannerState.lockTarget, scannerFilter.id);
+  const lockText = lockActive && Number.isFinite(scannerState.lockDistance)
+    ? `锁定 ${Math.round(scannerState.lockDistance)}m · ${Math.ceil(scannerState.lockTimer)}s`
+    : "";
   scannerName.textContent = `扫描 ${scannerFilter.name}`;
   scannerTrait.textContent = scannerFilter.id === "auto"
-    ? codexRouteState.pinnedId ? "图鉴路线" : "委托优先"
+    ? routeText || "委托优先"
+    : lockText
+      ? lockText
     : scannerState.focus > 0
       ? `专注 ${scannerState.focus}/3`
-      : codexRouteState.pinnedId ? "图鉴路线" : scannerTarget ? "雷达锁定" : "未发现目标";
+      : routeText || (scannerTarget ? "雷达锁定" : "未发现目标");
   scannerReadout.style.setProperty("--scanner-color", hexCss(scannerFilter.color));
-  scannerReadout.classList.toggle("hot", scannerState.pulse > 0.05 || codexRouteState.pulse > 0.05 || scannerFilter.id !== "auto");
+  scannerReadout.classList.toggle("hot", scannerState.pulse > 0.05 || scannerState.lockPulse > 0.05 || codexRouteState.pulse > 0.05 || scannerFilter.id !== "auto");
   const zone = biomeState.current || biomeZones[0];
   biomeName.textContent = zone.name;
   biomeTrait.textContent = zone.trait;
@@ -9034,9 +9396,13 @@ function nearestSalvageCache(includeUnscanned = false) {
   return nearest;
 }
 
-function scannerFilteredTarget() {
-  if (scannerState.targetFrame === performanceState.frame) return scannerState.target;
+function scannerFilteredTarget(force = false) {
   const filter = currentScannerFilter();
+  if (!force && scannerState.lockTimer > 0 && scannerState.lockFilterId === filter.id && isScannerLockValid(scannerState.lockTarget, filter.id)) {
+    return scannerState.lockTarget;
+  }
+  const refreshGap = performanceState.hitch > 0.35 ? 4 : 2;
+  if (!force && performanceState.frame - scannerState.targetFrame < refreshGap) return scannerState.target;
   let target = null;
   if (filter.id === "spore") target = nearestSpore();
   if (filter.id === "cache") target = nearestSalvageCache(true);
@@ -9093,8 +9459,7 @@ function animateMaterials(time) {
 }
 
 function addTrailBurst(count = 1, scale = 1) {
-  const requestedCount = count;
-  const burstCount = requestedCount <= 0 ? 0 : Math.max(1, Math.round(requestedCount * performanceEffectScale()));
+  const burstCount = reserveEffectCount(count);
   for (let i = 0; i < burstCount; i += 1) {
     const sprite = playerTrail.sprites[playerTrail.index];
     playerTrail.index = (playerTrail.index + 1) % playerTrail.sprites.length;
@@ -9115,7 +9480,7 @@ function addTrailBurst(count = 1, scale = 1) {
 
 function burstImpact(position, options = {}) {
   const requestedCount = options.count ?? 12;
-  const count = requestedCount <= 0 ? 0 : Math.max(1, Math.round(requestedCount * performanceEffectScale()));
+  const count = reserveEffectCount(requestedCount);
   const scale = options.scale ?? 1;
   const energy = options.energy ?? 1;
   const spread = options.spread ?? 1;
@@ -9155,7 +9520,7 @@ function burstImpact(position, options = {}) {
 }
 
 function spawnSpeedLines(count = 6, intensity = 1, color = 0x9ffbff) {
-  const lineCount = count <= 0 ? 0 : Math.max(1, Math.round(count * performanceEffectScale()));
+  const lineCount = reserveEffectCount(count);
   const dir = speedLineDirection;
   if (player.velocity.lengthSq() > 0.08) {
     dir.copy(player.velocity).normalize();

@@ -3,13 +3,711 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0; url=./jellyfish-cdn.html">
-  <title>Jellyfish Canyon Game</title>
-  <script>
-    window.location.replace("./jellyfish-cdn.html");
-  </script>
+  <title>深海水母漫游 - 海渊通行证</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, "SF Pro Display", "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      --cyan: #79f4ff;
+      --violet: #b99cff;
+      --mint: #76ffd2;
+      --amber: #ffd182;
+      --coral: #ff7f9e;
+      --text: rgba(237, 253, 255, .96);
+      --muted: rgba(194, 226, 234, .72);
+      --panel: rgba(2, 15, 28, .78);
+      --line: rgba(135, 235, 255, .26);
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(4, 46, 72, .6), rgba(1, 7, 18, .98) 58%),
+        repeating-linear-gradient(115deg, rgba(121, 244, 255, .05) 0 1px, transparent 1px 64px),
+        #010711;
+      color: var(--text);
+    }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .shell {
+      width: min(1060px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 430px;
+      gap: 26px;
+      align-items: stretch;
+    }
+
+    .scene,
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .32), inset 0 0 42px rgba(121, 244, 255, .08);
+      backdrop-filter: blur(18px);
+    }
+
+    .scene {
+      min-height: 620px;
+      position: relative;
+      overflow: hidden;
+      padding: 34px;
+    }
+
+    .scene::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(0,0,0,.34), transparent 16%, transparent 84%, rgba(0,0,0,.34)),
+        radial-gradient(circle at 50% 104%, rgba(121,244,255,.28), transparent 44%);
+      pointer-events: none;
+    }
+
+    .brand {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 14px;
+      max-width: 650px;
+    }
+
+    .kicker {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 9px;
+      color: var(--cyan);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .kicker::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background: var(--mint);
+      box-shadow: 0 0 16px var(--mint);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 6vw, 78px);
+      line-height: .92;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 560px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.7;
+    }
+
+    .rift {
+      position: absolute;
+      left: 50%;
+      bottom: 42px;
+      width: min(520px, 78%);
+      height: 290px;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .rift i {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: calc(44px + var(--i) * 34px);
+      height: calc(190px + var(--i) * 19px);
+      border: 1px solid rgba(121,244,255,.2);
+      border-bottom: 0;
+      border-radius: 50% 50% 0 0;
+      transform: translateX(-50%);
+      opacity: calc(.86 - var(--i) * .08);
+    }
+
+    .jelly {
+      position: absolute;
+      left: 42%;
+      bottom: 96px;
+      width: 88px;
+      height: 128px;
+      animation: drift 5.8s ease-in-out infinite;
+      filter: drop-shadow(0 0 22px rgba(121,244,255,.56));
+    }
+
+    .jelly::before {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: 0;
+      width: 60px;
+      height: 42px;
+      border-radius: 50% 50% 42% 42%;
+      border: 1px solid rgba(237,255,255,.72);
+      background: radial-gradient(circle at 50% 24%, #fff, #79f4ff 36%, rgba(185,156,255,.22) 78%);
+    }
+
+    .jelly::after {
+      content: "";
+      position: absolute;
+      left: 18px;
+      top: 48px;
+      width: 52px;
+      height: 80px;
+      background:
+        linear-gradient(90deg, transparent 0 6%, rgba(185,156,255,.88) 6% 10%, transparent 10% 24%, rgba(121,244,255,.9) 24% 29%, transparent 29% 45%, rgba(237,255,255,.72) 45% 50%, transparent 50% 67%, rgba(121,244,255,.9) 67% 72%, transparent 72% 88%, rgba(185,156,255,.88) 88% 92%, transparent 92%);
+    }
+
+    @keyframes drift {
+      0%, 100% { transform: translate3d(-22px, 0, 0) rotate(-3deg); }
+      50% { transform: translate3d(28px, -20px, 0) rotate(4deg); }
+    }
+
+    .panel {
+      min-height: 620px;
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    .status {
+      min-height: 22px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .tab,
+    .button,
+    .server {
+      border: 1px solid rgba(133, 235, 255, .26);
+      color: var(--text);
+      background: rgba(3, 16, 27, .62);
+      font: inherit;
+    }
+
+    .tab,
+    .button {
+      min-height: 44px;
+      padding: 0 16px;
+      cursor: pointer;
+    }
+
+    .tab.is-active,
+    .button.primary {
+      border-color: rgba(121,244,255,.58);
+      background: linear-gradient(135deg, rgba(121,244,255,.28), rgba(185,156,255,.22));
+      box-shadow: 0 0 24px rgba(121,244,255,.18);
+    }
+
+    .view {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .view.is-active {
+      display: flex;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      color: rgba(221, 250, 255, .86);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    input {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid rgba(133, 235, 255, .28);
+      background: rgba(0, 6, 14, .58);
+      color: var(--text);
+      padding: 0 13px;
+      font: 600 15px/1.2 inherit;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: rgba(121,244,255,.74);
+      box-shadow: 0 0 0 3px rgba(121,244,255,.14);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .notice {
+      border: 1px solid rgba(255,209,130,.24);
+      background: rgba(255,209,130,.08);
+      color: rgba(255, 235, 194, .88);
+      padding: 12px;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .server-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .pilot {
+      display: grid;
+      gap: 5px;
+    }
+
+    .pilot b {
+      font-size: 18px;
+    }
+
+    .pilot span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .servers {
+      display: grid;
+      gap: 10px;
+    }
+
+    .server {
+      --load: .3;
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .server.is-selected {
+      border-color: rgba(118,255,210,.78);
+      box-shadow: 0 0 26px rgba(118,255,210,.16);
+    }
+
+    .server-top,
+    .server-bottom {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .server em {
+      color: var(--muted);
+      font-style: normal;
+      font-size: 12px;
+    }
+
+    .load {
+      height: 6px;
+      overflow: hidden;
+      background: rgba(121,244,255,.12);
+    }
+
+    .load i {
+      display: block;
+      height: 100%;
+      width: calc(var(--load) * 100%);
+      background: linear-gradient(90deg, var(--mint), var(--cyan), var(--violet));
+      box-shadow: 0 0 16px rgba(121,244,255,.72);
+    }
+
+    .server strong {
+      color: var(--mint);
+      font-size: 13px;
+    }
+
+    .server.is-busy strong {
+      color: var(--amber);
+    }
+
+    .server.is-full strong {
+      color: var(--coral);
+    }
+
+    .summary {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .enter {
+      width: 100%;
+      min-height: 54px;
+      margin-top: auto;
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    @media (max-width: 880px) {
+      body { padding: 14px; place-items: stretch; }
+      .shell { grid-template-columns: 1fr; }
+      .scene { min-height: 280px; padding: 22px; }
+      .panel { min-height: auto; }
+      .lead { font-size: 15px; }
+      .rift { opacity: .64; height: 190px; }
+      .jelly { transform: scale(.74); bottom: 48px; }
+    }
+  </style>
 </head>
 <body>
-  <p><a href="./jellyfish-cdn.html">Open Jellyfish Canyon Game</a></p>
+  <main class="shell">
+    <section class="scene" aria-label="深海入口">
+      <div class="brand">
+        <div class="kicker">Abyss Gateway</div>
+        <h1>深海水母漫游</h1>
+        <p class="lead">接入潮汐节点，选择一片裂谷服务器，然后以潜航员身份进入荧光海沟。</p>
+      </div>
+      <div class="rift" aria-hidden="true">
+        <i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i>
+        <span class="jelly"></span>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="海渊通行证">
+      <div class="panel-head">
+        <div>
+          <h2>海渊通行证</h2>
+          <p id="status" class="status">登录或注册一个本地通行证。</p>
+        </div>
+      </div>
+
+      <div id="tabs" class="tabs" role="tablist">
+        <button id="loginTab" class="tab is-active" type="button" role="tab" aria-selected="true">登录</button>
+        <button id="registerTab" class="tab" type="button" role="tab" aria-selected="false">注册</button>
+      </div>
+
+      <form id="loginView" class="view is-active" autocomplete="on">
+        <label>
+          通行证或昵称
+          <input id="loginName" type="text" maxlength="18" autocomplete="username" placeholder="输入昵称">
+        </label>
+        <label>
+          暗号
+          <input id="loginSecret" type="password" maxlength="24" autocomplete="current-password" placeholder="随便输入即可">
+        </label>
+        <div class="actions">
+          <button id="loginButton" class="button primary" type="button">登录</button>
+          <button id="guestButton" class="button" type="button">游客登录</button>
+        </div>
+        <div class="notice">这是单机游戏的拟真入口，账号和服务器状态只保存在本机浏览器里。</div>
+      </form>
+
+      <form id="registerView" class="view">
+        <label>
+          昵称
+          <input id="registerName" type="text" maxlength="14" autocomplete="nickname" placeholder="水母指挥官">
+        </label>
+        <label>
+          通行证
+          <input id="registerAccount" type="text" maxlength="18" autocomplete="username" placeholder="abyss_id">
+        </label>
+        <label>
+          暗号
+          <input id="registerSecret" type="password" maxlength="24" autocomplete="new-password" placeholder="设置一个暗号">
+        </label>
+        <div class="actions">
+          <button id="registerButton" class="button primary" type="button">创建账号</button>
+          <button id="backLoginButton" class="button" type="button">返回登录</button>
+        </div>
+      </form>
+
+      <section id="serverView" class="view" aria-label="选择服务器">
+        <div class="server-head">
+          <div class="pilot">
+            <b id="pilotName">未登录</b>
+            <span id="pilotRank">海渊通行证 · 初始潜航员</span>
+          </div>
+          <button id="switchButton" class="button" type="button">切换账号</button>
+        </div>
+        <div id="servers" class="servers"></div>
+        <div id="summary" class="summary">请选择一个服务器。</div>
+      </section>
+
+      <button id="enterButton" class="button primary enter" type="button" disabled>进入裂谷</button>
+    </section>
+  </main>
+
+  <script>
+    const SESSION_KEY = "jellyfishPortalSession";
+    const PILOT_KEY = "jellyfishPilot";
+    const SERVER_KEY = "jellyfishPreferredServer";
+
+    const serverCatalog = [
+      { id: "blue-rift", name: "一区 · 蓝潮裂谷", region: "华东", basePing: 28 },
+      { id: "night-reef", name: "二区 · 夜光礁", region: "华北", basePing: 42 },
+      { id: "silent-tide", name: "三区 · 静潮湾", region: "国际", basePing: 74 }
+    ];
+
+    const state = {
+      screen: "login",
+      pilot: localStorage.getItem(PILOT_KEY) || "",
+      selectedServerId: localStorage.getItem(SERVER_KEY) || "blue-rift",
+      servers: createServers()
+    };
+
+    const status = document.querySelector("#status");
+    const tabs = document.querySelector("#tabs");
+    const loginTab = document.querySelector("#loginTab");
+    const registerTab = document.querySelector("#registerTab");
+    const loginView = document.querySelector("#loginView");
+    const registerView = document.querySelector("#registerView");
+    const serverView = document.querySelector("#serverView");
+    const loginName = document.querySelector("#loginName");
+    const loginSecret = document.querySelector("#loginSecret");
+    const registerName = document.querySelector("#registerName");
+    const registerAccount = document.querySelector("#registerAccount");
+    const registerSecret = document.querySelector("#registerSecret");
+    const pilotName = document.querySelector("#pilotName");
+    const pilotRank = document.querySelector("#pilotRank");
+    const servers = document.querySelector("#servers");
+    const summary = document.querySelector("#summary");
+    const enterButton = document.querySelector("#enterButton");
+
+    loginName.value = state.pilot;
+    renderServers();
+    setStatus(state.pilot ? `欢迎回来，${state.pilot}。` : "登录或注册一个本地通行证。");
+
+    function createServers() {
+      return serverCatalog.map((server) => ({
+        ...server,
+        capacity: 40,
+        population: randomInt(0, 40),
+        ping: server.basePing + randomInt(-5, 8)
+      }));
+    }
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function cleanName(value, fallback) {
+      return `${value || ""}`.trim().replace(/\s+/g, " ").slice(0, 14) || fallback;
+    }
+
+    function setStatus(text) {
+      status.textContent = text;
+    }
+
+    function getServerState(server) {
+      const load = Math.max(0, Math.min(1, server.population / server.capacity));
+      if (server.population >= 36) return { load, label: "爆满", className: "is-full" };
+      if (server.population >= 24) return { load, label: "拥挤", className: "is-busy" };
+      if (server.population >= 8) return { load, label: "推荐", className: "" };
+      return { load, label: "流畅", className: "" };
+    }
+
+    function setScreen(screen) {
+      state.screen = screen;
+      tabs.hidden = screen === "server";
+      loginView.classList.toggle("is-active", screen === "login");
+      registerView.classList.toggle("is-active", screen === "register");
+      serverView.classList.toggle("is-active", screen === "server");
+      loginTab.classList.toggle("is-active", screen === "login");
+      registerTab.classList.toggle("is-active", screen === "register");
+      loginTab.setAttribute("aria-selected", `${screen === "login"}`);
+      registerTab.setAttribute("aria-selected", `${screen === "register"}`);
+      enterButton.disabled = screen !== "server";
+      if (screen === "server") {
+        pilotName.textContent = `${state.pilot} · 已登录`;
+        pilotRank.textContent = "海渊通行证 · 潜航员";
+        renderServers();
+        updateSummary();
+      }
+    }
+
+    function completeAuth(pilot) {
+      state.pilot = pilot;
+      localStorage.setItem(PILOT_KEY, pilot);
+      setStatus(`通行证校验完成，${pilot}。请选择服务器。`);
+      setScreen("server");
+    }
+
+    function login(asGuest = false) {
+      const pilot = asGuest ? `游客${randomInt(1000, 9999)}` : cleanName(loginName.value, "");
+      if (!pilot) {
+        setStatus("请输入昵称，或使用游客登录。");
+        loginName.focus();
+        return;
+      }
+      if (!asGuest && !loginSecret.value.trim()) {
+        setStatus("请输入暗号。这里不会真的验证。");
+        loginSecret.focus();
+        return;
+      }
+      setStatus(`正在接入 ${pilot} 的海渊通行证...`);
+      window.setTimeout(() => completeAuth(pilot), asGuest ? 180 : 320);
+    }
+
+    function register() {
+      const pilot = cleanName(registerName.value || registerAccount.value, "");
+      const account = cleanName(registerAccount.value, "");
+      if (!pilot || !account) {
+        setStatus("请填写昵称和通行证。");
+        (pilot ? registerAccount : registerName).focus();
+        return;
+      }
+      if (registerSecret.value.trim().length < 3) {
+        setStatus("暗号至少 3 个字符。");
+        registerSecret.focus();
+        return;
+      }
+      setStatus(`正在创建 ${pilot} 的本地档案...`);
+      window.setTimeout(() => completeAuth(pilot), 360);
+    }
+
+    function renderServers() {
+      servers.replaceChildren();
+      state.servers.forEach((server) => {
+        const serverState = getServerState(server);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `server ${serverState.className}`.trim();
+        button.classList.toggle("is-selected", server.id === state.selectedServerId);
+        button.style.setProperty("--load", serverState.load.toFixed(3));
+        button.setAttribute("aria-pressed", `${server.id === state.selectedServerId}`);
+        button.innerHTML = `
+          <span class="server-top"><b>${server.name}</b><em>${server.region}</em></span>
+          <span class="load"><i></i></span>
+          <span class="server-bottom"><span>${server.population} 人在线</span><strong>${serverState.label}</strong></span>
+        `;
+        button.addEventListener("click", () => {
+          state.selectedServerId = server.id;
+          localStorage.setItem(SERVER_KEY, server.id);
+          renderServers();
+          updateSummary();
+          setStatus(`已选择 ${server.name}。`);
+        });
+        servers.append(button);
+      });
+    }
+
+    function getSelectedServer() {
+      return state.servers.find((server) => server.id === state.selectedServerId) || state.servers[0];
+    }
+
+    function updateSummary() {
+      const server = getSelectedServer();
+      const serverState = getServerState(server);
+      summary.textContent = `${server.name} · ${serverState.label} · ${server.population} 人在线 · 延迟 ${server.ping}ms`;
+      enterButton.disabled = !server;
+    }
+
+    function refreshPopulations() {
+      state.servers.forEach((server) => {
+        server.population = Math.max(0, Math.min(40, server.population + randomInt(-2, 3)));
+        server.ping = Math.max(18, Math.min(128, server.ping + randomInt(-3, 4)));
+      });
+      if (state.screen === "server") {
+        renderServers();
+        updateSummary();
+      }
+    }
+
+    function enterGame() {
+      if (state.screen !== "server") {
+        login(false);
+        return;
+      }
+      const server = getSelectedServer();
+      const session = {
+        pilot: state.pilot,
+        serverId: server.id,
+        serverName: server.name,
+        region: server.region,
+        population: server.population,
+        ping: server.ping,
+        issuedAt: Date.now()
+      };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(PILOT_KEY, state.pilot);
+      localStorage.setItem(SERVER_KEY, server.id);
+      enterButton.disabled = true;
+      enterButton.textContent = "连接中...";
+      setStatus(`正在连接 ${server.name}...`);
+      window.setTimeout(() => {
+        window.location.href = "./jellyfish-cdn.html";
+      }, 360);
+    }
+
+    loginTab.addEventListener("click", () => {
+      setScreen("login");
+      setStatus(state.pilot ? `欢迎回来，${state.pilot}。` : "登录或注册一个本地通行证。");
+    });
+    registerTab.addEventListener("click", () => {
+      setScreen("register");
+      setStatus("创建新的本地通行证。");
+    });
+    document.querySelector("#loginButton").addEventListener("click", () => login(false));
+    document.querySelector("#guestButton").addEventListener("click", () => login(true));
+    document.querySelector("#registerButton").addEventListener("click", register);
+    document.querySelector("#backLoginButton").addEventListener("click", () => setScreen("login"));
+    document.querySelector("#switchButton").addEventListener("click", () => {
+      setScreen("login");
+      setStatus("已返回账号入口。");
+    });
+    enterButton.addEventListener("click", enterGame);
+    loginView.addEventListener("submit", (event) => {
+      event.preventDefault();
+      login(false);
+    });
+    registerView.addEventListener("submit", (event) => {
+      event.preventDefault();
+      register();
+    });
+    addEventListener("keydown", (event) => {
+      if (event.code === "Enter" && state.screen === "server") {
+        event.preventDefault();
+        enterGame();
+      }
+    });
+
+    window.setInterval(refreshPopulations, 3400);
+  </script>
 </body>
 </html>
