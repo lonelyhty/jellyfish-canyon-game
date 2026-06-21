@@ -1068,6 +1068,138 @@
       transform: translate(-50%, -50%) scale(1);
     }
 
+    .server-chat {
+      position: fixed;
+      z-index: 4;
+      left: 32px;
+      bottom: 86px;
+      width: min(342px, calc(100vw - 64px));
+      display: grid;
+      gap: 7px;
+      color: rgba(226, 253, 255, .82);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity .24s ease, transform .24s ease;
+      text-shadow: 0 0 12px rgba(121,244,255,.24);
+    }
+
+    .server-chat.is-active {
+      opacity: .94;
+      transform: translateY(0);
+    }
+
+    .chat-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--cyan);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .chat-head span {
+      color: rgba(220, 251, 255, .56);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .chat-log {
+      max-height: 126px;
+      display: grid;
+      gap: 5px;
+      overflow: hidden;
+      mask-image: linear-gradient(180deg, transparent, #000 16px, #000 100%);
+    }
+
+    .chat-line {
+      min-width: 0;
+      padding: 6px 8px;
+      border-left: 2px solid var(--cyan);
+      border-radius: 4px;
+      background: rgba(2, 13, 25, .42);
+      box-shadow: inset 0 0 16px rgba(121,244,255,.05);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .chat-line b {
+      margin-right: 5px;
+      color: var(--cyan);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .chat-line span {
+      color: rgba(235, 253, 255, .78);
+      overflow-wrap: anywhere;
+    }
+
+    .chat-line.system {
+      border-left-color: var(--amber);
+    }
+
+    .chat-line.system b {
+      color: var(--amber);
+    }
+
+    .chat-line.self {
+      border-left-color: var(--mint);
+      background: rgba(8, 42, 45, .48);
+    }
+
+    .chat-line.self b {
+      color: var(--mint);
+    }
+
+    .chat-form {
+      display: flex;
+      gap: 6px;
+      pointer-events: auto;
+      opacity: .38;
+      transition: opacity .18s ease;
+    }
+
+    .server-chat.is-writing .chat-form,
+    .chat-form:focus-within {
+      opacity: 1;
+    }
+
+    .chat-form input {
+      min-width: 0;
+      flex: 1;
+      height: 30px;
+      padding: 0 9px;
+      border: 1px solid rgba(133, 235, 255, .24);
+      border-radius: 5px;
+      color: var(--text);
+      background: rgba(2, 13, 25, .64);
+      outline: none;
+      font: 600 12px/1 Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      box-shadow: inset 0 0 12px rgba(121,244,255,.06);
+    }
+
+    .chat-form input:focus {
+      border-color: rgba(226, 253, 255, .58);
+      box-shadow: inset 0 0 16px rgba(121,244,255,.1), 0 0 18px rgba(121,244,255,.16);
+    }
+
+    .chat-form button {
+      width: 54px;
+      height: 30px;
+      border: 1px solid rgba(133, 235, 255, .3);
+      border-radius: 5px;
+      color: var(--text);
+      background: rgba(3, 16, 27, .66);
+      font: 800 12px/1 Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      cursor: pointer;
+    }
+
     .screen-flash {
       position: fixed;
       inset: 0;
@@ -1899,7 +2031,7 @@
         left: 16px;
         right: auto;
         top: auto;
-        bottom: 182px;
+        bottom: 224px;
         max-width: calc(100vw - 156px);
         font-size: 12px;
         line-height: 1.35;
@@ -1909,8 +2041,51 @@
         left: 16px;
         right: auto;
         top: auto;
-        bottom: 148px;
+        bottom: 190px;
         width: calc(100vw - 156px);
+      }
+
+      .server-chat {
+        left: 16px;
+        right: 16px;
+        bottom: 132px;
+        width: auto;
+        gap: 4px;
+      }
+
+      .chat-head {
+        display: none;
+      }
+
+      .chat-log {
+        max-height: 54px;
+        gap: 4px;
+      }
+
+      .chat-line {
+        padding: 5px 7px;
+        font-size: 10px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chat-line b {
+        font-size: 10px;
+      }
+
+      .chat-form {
+        display: none;
+      }
+
+      .server-chat.is-writing {
+        left: 16px;
+        right: 16px;
+        bottom: 132px;
+      }
+
+      .server-chat.is-writing .chat-form {
+        display: flex;
       }
 
       .boss-strip {
@@ -2139,6 +2314,14 @@
   </div>
 
   <div id="message" class="message" aria-live="polite"></div>
+  <section id="serverChat" class="server-chat" aria-label="服务器频道">
+    <div class="chat-head">Server Channel <span id="chatStatus">离线</span></div>
+    <div id="chatLog" class="chat-log" aria-live="polite"></div>
+    <form id="chatForm" class="chat-form" autocomplete="off">
+      <input id="chatInput" type="text" maxlength="42" placeholder="频道消息">
+      <button type="submit">发送</button>
+    </form>
+  </section>
   <div id="screenFlash" class="screen-flash"></div>
   <div id="stormOverlay" class="storm-overlay"></div>
 
@@ -2323,6 +2506,11 @@ const bestScoreValue = document.querySelector("#bestScoreValue");
 const radar = document.querySelector("#radar");
 const radarArrow = document.querySelector("#radarArrow");
 const message = document.querySelector("#message");
+const serverChat = document.querySelector("#serverChat");
+const chatStatus = document.querySelector("#chatStatus");
+const chatLog = document.querySelector("#chatLog");
+const chatForm = document.querySelector("#chatForm");
+const chatInput = document.querySelector("#chatInput");
 const screenFlash = document.querySelector("#screenFlash");
 const stormOverlay = document.querySelector("#stormOverlay");
 const upgradePanel = document.querySelector("#upgradePanel");
@@ -2391,6 +2579,13 @@ const sceneProfiles = {
     light: { hemi: 0x3b9aca, ground: 0x020713, moon: 0x9de7ff, side: 0x8b72ff, exposure: 1.16 },
     flow: { planktonLift: 0.1, planktonDrift: 0.12, streamSpeed: 1.22, streamOpacity: 1.24, bloom: 0.04 },
     remoteNames: ["Blue_17", "RiftEcho", "Lantern_09"],
+    chatLines: [
+      "外缘水流很顺，连收孢子挺快。",
+      "刚看到一条蓝色光流，跟着它走。",
+      "一区延迟稳，适合刷委托。",
+      "有人去海沟之心了吗？",
+      "信标放在样本堆旁边会很舒服。"
+    ],
     message: "蓝潮裂谷已接入，稳定水层适合开始潜航。"
   },
   "night-reef": {
@@ -2407,6 +2602,13 @@ const sceneProfiles = {
     light: { hemi: 0x4439a4, ground: 0x040614, moon: 0xc0b2ff, side: 0x6f8cff, exposure: 1.08 },
     flow: { planktonLift: 0.055, planktonDrift: 0.055, streamSpeed: 0.72, streamOpacity: 0.62, bloom: 0.18 },
     remoteNames: ["Nocturne", "Crystal_21", "ReefGhost"],
+    chatLines: [
+      "夜光礁的晶体会挡视线，雷达别关。",
+      "晶辉穹顶附近声呐收益很高。",
+      "二区有点暗，但样本刷新漂亮。",
+      "刚封存一个危险回声，热度降了。",
+      "紫色星芒那边好像有遗迹。"
+    ],
     message: "夜光礁海已接入，晶辉穹顶的声呐回声更加明亮。"
   },
   "silent-tide": {
@@ -2423,6 +2625,13 @@ const sceneProfiles = {
     light: { hemi: 0x236f67, ground: 0x02120d, moon: 0x98ffd6, side: 0x4fe1ff, exposure: 1.0 },
     flow: { planktonLift: 0.025, planktonDrift: 0.035, streamSpeed: 0.48, streamOpacity: 0.38, bloom: 0.04 },
     remoteNames: ["Tide_03", "QuietBay", "GardenPulse"],
+    chatLines: [
+      "静潮这边慢一点，但是很适合找珍珠。",
+      "别急着冲，花园雾里有隐藏样本。",
+      "三区人少，圣所上传基本没人抢。",
+      "绿潮亮的时候跟着气泡走。",
+      "深湾回声低，适合安静推图。"
+    ],
     message: "静潮深湾已接入，深层海流安静但更幽暗。"
   }
 };
@@ -2666,6 +2875,14 @@ const gateway = {
   connecting: false,
   populationTimer: 0,
   servers: createGatewayServers()
+};
+const chatState = {
+  lines: [],
+  timer: 3.2,
+  activeServerId: "",
+  writing: false,
+  maxLines: 6,
+  replyArmed: false
 };
 const player = {
   group: new THREE.Group(),
@@ -5909,6 +6126,121 @@ function createGatewayServers() {
   });
 }
 
+function chatRoster(profile = activeSceneProfile) {
+  const names = [remotePlayer?.name, ...(profile.remoteNames || [])].filter(Boolean);
+  return [...new Set(names)];
+}
+
+function chatCleanText(value, fallback = "") {
+  const text = `${value || ""}`.replace(/\s+/g, " ").trim();
+  return (text || fallback).slice(0, 42);
+}
+
+function selectedServerForProfile(profile = activeSceneProfile) {
+  return gateway.servers.find((server) => server.sceneId === profile.id || server.id === profile.id) || gateway.servers[0];
+}
+
+function addServerChatLine(author, text, type = "remote") {
+  if (!chatLog) return;
+  const line = document.createElement("div");
+  line.className = `chat-line ${type}`.trim();
+  const name = document.createElement("b");
+  name.textContent = author;
+  const body = document.createElement("span");
+  body.textContent = text;
+  line.append(name, body);
+  chatLog.append(line);
+  chatState.lines.push({ author, text, type });
+  while (chatState.lines.length > chatState.maxLines) {
+    chatState.lines.shift();
+    chatLog.firstElementChild?.remove();
+  }
+}
+
+function setChatWriting(open) {
+  if (open && player.introOpen) return;
+  chatState.writing = open;
+  serverChat.classList.toggle("is-writing", open);
+  if (open) {
+    input.keys.clear();
+    chatInput.focus();
+  } else {
+    chatInput.blur();
+  }
+}
+
+function resetServerChat(profile = activeSceneProfile) {
+  chatState.activeServerId = profile.id;
+  chatState.lines = [];
+  chatState.timer = THREE.MathUtils.randFloat(4.5, 8.5);
+  chatState.replyArmed = false;
+  chatLog.replaceChildren();
+  chatInput.value = "";
+  setChatWriting(false);
+  const server = selectedServerForProfile(profile);
+  chatStatus.textContent = `${profile.name} · ${server.population} 在线`;
+  addServerChatLine("系统", `${profile.name} 频道已连接，当前 ${server.population} 人在线。`, "system");
+  const names = chatRoster(profile);
+  const starter = profile.chatLines || sceneProfiles["blue-rift"].chatLines;
+  addServerChatLine(names[0] || "Abyss", starter[THREE.MathUtils.randInt(0, starter.length - 1)]);
+}
+
+function randomServerChatText(profile = activeSceneProfile) {
+  const lines = [...(profile.chatLines || [])];
+  if (mission.progress > 0 && mission.progress < mission.target) lines.push(`我这边委托 ${mission.progress}/${mission.target}，继续推进。`);
+  if (storm.intensity > 0.22) lines.push("风暴来了，先别贴太近危险回声。");
+  if (echoState.heat > 0.56) lines.push("频道提示：回声热度偏高，声呐后记得拉开。");
+  if (player.spores > 0 && !player.gateOpened) lines.push(`已经收了 ${player.spores} 个孢子，雷达还能锁目标。`);
+  if (player.gateOpened) lines.push("海沟之心已亮，回门路上小心掠食者。");
+  if (researchState.carried > 0) lines.push("样本舱有货就找圣所上传，别满舱漂太久。");
+  return lines[THREE.MathUtils.randInt(0, lines.length - 1)] || "频道信号稳定。";
+}
+
+function pushAutoServerChat() {
+  const profile = activeSceneProfile;
+  const roster = chatRoster(profile);
+  const author = roster[THREE.MathUtils.randInt(0, Math.max(0, roster.length - 1))] || "Abyss";
+  const replies = [
+    "收到，我也在这条线附近。",
+    "可以，雷达上看得到你的脉冲。",
+    "我刚从圣所回来，附近安全。",
+    "频道收到，继续潜航。"
+  ];
+  const text = chatState.replyArmed ? replies[THREE.MathUtils.randInt(0, replies.length - 1)] : randomServerChatText(profile);
+  chatState.replyArmed = false;
+  addServerChatLine(author, text);
+}
+
+function updateServerChat(delta) {
+  const active = !player.introOpen;
+  serverChat.classList.toggle("is-active", active);
+  if (!active) return;
+  if (chatState.activeServerId !== activeSceneProfile.id) resetServerChat(activeSceneProfile);
+  const server = selectedServerForProfile(activeSceneProfile);
+  chatStatus.textContent = `${activeSceneProfile.name} · ${server.population} 在线`;
+  if (chatState.writing) return;
+  chatState.timer -= delta;
+  if (chatState.timer <= 0) {
+    pushAutoServerChat();
+    chatState.timer = THREE.MathUtils.randFloat(7.5, 14.5);
+  }
+}
+
+function submitChatMessage() {
+  const text = chatCleanText(chatInput.value);
+  if (!text) {
+    setChatWriting(false);
+    return;
+  }
+  const pilot = chatCleanText(gateway.pilot, "我");
+  addServerChatLine(pilot, text, "self");
+  chatInput.value = "";
+  setChatWriting(false);
+  chatState.replyArmed = true;
+  chatState.timer = THREE.MathUtils.randFloat(1.2, 2.6);
+  playSfx("click", 0.45);
+}
+
 function sceneProfileFor(id) {
   return sceneProfiles[id] || sceneProfiles["blue-rift"];
 }
@@ -5983,6 +6315,7 @@ function applySceneProfile(id, movePlayer = true) {
   applySceneAtmosphere(profile.id);
   applySceneRemoteIdentity(profile);
   retintAmbientLife(profile);
+  resetServerChat(profile);
   if (movePlayer) {
     player.group.position.copy(profile.spawn);
     player.velocity.set(0, 0, 0);
@@ -6268,11 +6601,27 @@ function handleGatewayEnter() {
 
 function bindInput() {
   addEventListener("keydown", (event) => {
+    if (chatState.writing || document.activeElement === chatInput) {
+      if (event.code === "Enter" && !event.isComposing) {
+        event.preventDefault();
+        submitChatMessage();
+      } else if (event.code === "Escape") {
+        event.preventDefault();
+        chatInput.value = "";
+        setChatWriting(false);
+      }
+      return;
+    }
     if (player.introOpen) {
       if (event.code === "Enter" && !event.isComposing) {
         event.preventDefault();
         handleGatewayEnter();
       }
+      return;
+    }
+    if (event.code === "Enter" && !event.isComposing) {
+      event.preventDefault();
+      setChatWriting(true);
       return;
     }
     unlockMusic();
@@ -6332,6 +6681,13 @@ function bindInput() {
     setGatewayStatus("已返回账号入口。");
   });
   introStart.addEventListener("click", () => startGameFromIntro());
+  chatForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitChatMessage();
+  });
+  chatInput.addEventListener("focus", () => {
+    if (!player.introOpen) setChatWriting(true);
+  });
 
   canvas.addEventListener("pointerdown", (event) => {
     if (player.introOpen) return;
@@ -7985,6 +8341,7 @@ function loop() {
 
 function update(delta, time) {
   updateGateway(delta);
+  updateServerChat(delta);
   updateMovement(delta);
   updateBiome(delta, time);
   updateTide(delta, time);
@@ -9090,6 +9447,7 @@ function completeMission() {
   updateScoreReadout();
   playSfx("upgrade", 0.84);
   showMessage(`裂谷委托完成：${mission.title}`, 1300);
+  addServerChatLine("系统", `${gateway.pilot || "潜航员"} 完成了裂谷委托：${mission.title}。`, "system");
   addTrailBurst(12, 1.35);
   flashScreen();
   setTimeout(() => startMission(), 900);
@@ -9127,6 +9485,7 @@ function openHeartGate() {
   playSfx("upgrade", 1);
   addTrailBurst(18, 1.65);
   showMessage("海沟之心已苏醒，跟随雷达返回遗迹门。", 2600);
+  addServerChatLine("系统", `${gateway.pilot || "潜航员"} 唤醒了海沟之心。`, "system");
   flashScreen();
 }
 
