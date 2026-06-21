@@ -929,6 +929,118 @@
       box-shadow: 0 0 12px rgba(255,209,130,.62);
     }
 
+    .squad-panel {
+      position: fixed;
+      right: 48px;
+      top: 304px;
+      z-index: 4;
+      width: min(330px, calc(100vw - 96px));
+      display: grid;
+      gap: 8px;
+      padding: 10px 11px;
+      color: rgba(226, 253, 255, .78);
+      background: linear-gradient(180deg, rgba(2, 13, 25, .5), rgba(2, 13, 25, .24));
+      border: 1px solid rgba(133, 235, 255, .18);
+      border-radius: 7px;
+      box-shadow: inset 0 0 18px rgba(121,244,255,.05), 0 0 22px rgba(0,0,0,.18);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .24s ease, transform .24s ease, border-color .2s ease;
+      text-shadow: 0 0 10px rgba(121,244,255,.22);
+    }
+
+    .squad-panel.is-active {
+      opacity: .92;
+      transform: translateY(0);
+    }
+
+    .squad-panel.hot {
+      border-color: rgba(118, 255, 210, .42);
+      box-shadow: inset 0 0 18px rgba(118,255,210,.07), 0 0 24px rgba(118,255,210,.16);
+    }
+
+    .squad-head,
+    .squad-member {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .squad-head b {
+      color: var(--cyan);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .squad-head span,
+    .squad-distance {
+      color: rgba(220, 251, 255, .58);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .squad-member-main {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .squad-dot {
+      width: 10px;
+      height: 10px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: var(--mint);
+      box-shadow: 0 0 14px var(--mint);
+    }
+
+    .squad-copy {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+    }
+
+    .squad-copy b {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: rgba(238, 255, 255, .95);
+      font-size: 12px;
+    }
+
+    .squad-copy em {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: rgba(219, 250, 255, .58);
+      font-size: 10px;
+      font-style: normal;
+    }
+
+    .squad-sync {
+      height: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(133, 235, 255, .16);
+      border-radius: 99px;
+      background: rgba(3, 16, 27, .36);
+    }
+
+    .squad-sync span {
+      display: block;
+      width: 100%;
+      height: 100%;
+      transform-origin: left;
+      background: linear-gradient(90deg, var(--mint), var(--cyan));
+      box-shadow: 0 0 14px var(--cyan);
+    }
+
     .boss-strip {
       position: fixed;
       z-index: 5;
@@ -2045,6 +2157,34 @@
         width: calc(100vw - 156px);
       }
 
+      .squad-panel {
+        left: 16px;
+        right: 150px;
+        top: auto;
+        bottom: 258px;
+        width: auto;
+        padding: 8px 9px;
+        gap: 6px;
+      }
+
+      .squad-head b {
+        font-size: 10px;
+      }
+
+      .squad-head span,
+      .squad-distance,
+      .squad-copy em {
+        font-size: 9px;
+      }
+
+      .squad-head span {
+        display: none;
+      }
+
+      .squad-copy b {
+        font-size: 11px;
+      }
+
       .server-chat {
         left: 16px;
         right: 16px;
@@ -2302,6 +2442,18 @@
     <div class="mission-bar"><span id="missionFill"></span></div>
   </div>
 
+  <section id="squadPanel" class="squad-panel" aria-label="队伍同步">
+    <div class="squad-head"><b>队伍同步</b><span id="squadServer">2/4 小队</span></div>
+    <div class="squad-member">
+      <div class="squad-member-main">
+        <i class="squad-dot"></i>
+        <div class="squad-copy"><b id="squadName">Abyss_09</b><em id="squadStatus">等待接入</em></div>
+      </div>
+      <span id="squadDistance" class="squad-distance">--m</span>
+    </div>
+    <div class="squad-sync"><span id="squadSyncFill"></span></div>
+  </section>
+
   <div id="bossStrip" class="boss-strip" aria-label="幽影事件">
     <b id="bossLabel">深渊幽影</b>
     <div class="boss-bar"><span id="bossFill"></span></div>
@@ -2497,6 +2649,12 @@ const objectiveLabel = document.querySelector("#objectiveLabel");
 const missionLabel = document.querySelector("#missionLabel");
 const missionProgress = document.querySelector("#missionProgress");
 const missionFill = document.querySelector("#missionFill");
+const squadPanel = document.querySelector("#squadPanel");
+const squadServer = document.querySelector("#squadServer");
+const squadName = document.querySelector("#squadName");
+const squadStatus = document.querySelector("#squadStatus");
+const squadDistance = document.querySelector("#squadDistance");
+const squadSyncFill = document.querySelector("#squadSyncFill");
 const bossStrip = document.querySelector("#bossStrip");
 const bossLabel = document.querySelector("#bossLabel");
 const bossFill = document.querySelector("#bossFill");
@@ -2883,6 +3041,13 @@ const chatState = {
   writing: false,
   maxLines: 6,
   replyArmed: false
+};
+const squadState = {
+  activeServerId: "",
+  status: "跟随中",
+  sync: 0.72,
+  pulse: 0,
+  pingTimer: 10
 };
 const player = {
   group: new THREE.Group(),
@@ -6241,6 +6406,66 @@ function submitChatMessage() {
   playSfx("click", 0.45);
 }
 
+function resetSquadPanel(profile = activeSceneProfile) {
+  squadState.activeServerId = profile.id;
+  squadState.status = "跟随中";
+  squadState.sync = 0.72;
+  squadState.pulse = 1;
+  squadState.pingTimer = THREE.MathUtils.randFloat(8, 14);
+  squadName.textContent = remotePlayer?.name || chatRoster(profile)[0] || "Abyss_09";
+  updateSquadHud(0);
+}
+
+function squadStatusText(distance) {
+  if (remotePlayer.pulse > 0.25) return "正在释放脉冲";
+  if (remotePlayer.velocity.length() > 7) return "疾游跟随";
+  if (distance > 38) return "重新汇合";
+  if (mission.type === "echo" && echoState.heat > 0.45) return "警戒回声";
+  if (mission.type === "upload" && researchState.carried > 0) return "护送样本";
+  if (mission.type === "cache") return "标记货舱";
+  if (mission.type === "relic") return "扫描遗迹";
+  if (mission.type === "pearl") return "搜寻珍珠";
+  return "跟随中";
+}
+
+function squadPingText() {
+  if (mission.type === "echo" || echoState.heat > 0.62) return "我来压一波回声，你保持距离。";
+  if (mission.type === "upload" && researchState.carried > 0) return "圣所方向安全，样本可以上传。";
+  if (mission.type === "cache") return "货舱信号在雷达边缘，靠近后扫一下。";
+  if (mission.type === "relic") return "遗迹声纹有反应，R 声呐能充能。";
+  if (mission.type === "pearl") return "深处有珍珠反光，别让热度叠太高。";
+  if (player.gateOpened) return "海沟之心已亮，我跟在侧翼。";
+  return "我在侧翼跟随，看到孢子就标记。";
+}
+
+function updateSquadHud(delta) {
+  const active = !player.introOpen;
+  squadPanel.classList.toggle("is-active", active);
+  if (!active) return;
+  if (squadState.activeServerId !== activeSceneProfile.id) resetSquadPanel(activeSceneProfile);
+
+  const server = selectedServerForProfile(activeSceneProfile);
+  const distance = remotePlayer.group.position.distanceTo(player.group.position);
+  const targetSync = THREE.MathUtils.clamp(1 - distance / 72 + remotePlayer.pulse * 0.12, 0.18, 1);
+  squadState.sync = THREE.MathUtils.lerp(squadState.sync, targetSync, 1 - Math.pow(0.03, delta || 0.016));
+  squadState.status = squadStatusText(distance);
+  squadState.pulse = Math.max(0, squadState.pulse - delta * 1.5);
+
+  squadServer.textContent = `${server.name.replace(/^.*?·\s*/, "")} · 2/${server.population > 32 ? 4 : 3}`;
+  squadName.textContent = remotePlayer.name || squadName.textContent;
+  squadStatus.textContent = squadState.status;
+  squadDistance.textContent = `${Math.max(1, Math.round(distance))}m`;
+  squadSyncFill.style.transform = `scaleX(${THREE.MathUtils.clamp(squadState.sync, 0.06, 1)})`;
+  squadPanel.classList.toggle("hot", squadState.pulse > 0.05 || remotePlayer.pulse > 0.2);
+
+  squadState.pingTimer -= delta;
+  if (squadState.pingTimer <= 0 && !chatState.writing) {
+    addServerChatLine(remotePlayer.name || "Abyss", squadPingText());
+    squadState.pulse = 1;
+    squadState.pingTimer = THREE.MathUtils.randFloat(18, 30);
+  }
+}
+
 function sceneProfileFor(id) {
   return sceneProfiles[id] || sceneProfiles["blue-rift"];
 }
@@ -6316,6 +6541,7 @@ function applySceneProfile(id, movePlayer = true) {
   applySceneRemoteIdentity(profile);
   retintAmbientLife(profile);
   resetServerChat(profile);
+  resetSquadPanel(profile);
   if (movePlayer) {
     player.group.position.copy(profile.spawn);
     player.velocity.set(0, 0, 0);
@@ -8342,6 +8568,7 @@ function loop() {
 function update(delta, time) {
   updateGateway(delta);
   updateServerChat(delta);
+  updateSquadHud(delta);
   updateMovement(delta);
   updateBiome(delta, time);
   updateTide(delta, time);
@@ -8627,6 +8854,7 @@ function triggerRemotePulse() {
   remotePlayer.pulse = 1.18;
   remotePlayer.hazard = Math.max(remotePlayer.hazard, 0.12);
   remotePlayer.pulseCooldown = THREE.MathUtils.randFloat(5.2, 9.5);
+  squadState.pulse = 1;
   const dir = tmp.copy(remotePlayer.velocity.lengthSq() > 0.05 ? remotePlayer.velocity : getForward());
   if (dir.lengthSq() > 0.001) dir.normalize();
   remotePlayer.velocity.addScaledVector(dir, 5.8);
