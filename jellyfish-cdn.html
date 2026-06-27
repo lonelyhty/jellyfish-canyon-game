@@ -1342,6 +1342,80 @@
       box-shadow: 0 0 18px rgba(118,255,210,.1);
     }
 
+    .achievement-toast {
+      position: fixed;
+      z-index: 7;
+      left: 50%;
+      top: 84px;
+      width: min(390px, calc(100vw - 48px));
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 11px 12px;
+      color: rgba(235, 253, 255, .94);
+      background: linear-gradient(135deg, rgba(255,209,130,.22), rgba(2,13,25,.76) 42%, rgba(118,255,210,.12));
+      border: 1px solid rgba(255, 209, 130, .38);
+      border-radius: 8px;
+      box-shadow: inset 0 0 22px rgba(255,209,130,.05), 0 18px 52px rgba(0,0,0,.32);
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -14px) scale(.98);
+      transition: opacity .22s ease, transform .22s ease;
+      text-shadow: 0 0 12px rgba(255,209,130,.18);
+    }
+
+    .achievement-toast.show {
+      opacity: .96;
+      transform: translate(-50%, 0) scale(1);
+    }
+
+    .achievement-icon {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 209, 130, .36);
+      border-radius: 50%;
+      color: var(--amber);
+      background: rgba(3, 16, 27, .54);
+      box-shadow: inset 0 0 14px rgba(255,209,130,.08), 0 0 18px rgba(255,209,130,.12);
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .achievement-copy {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+
+    .achievement-copy b {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--amber);
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .achievement-copy strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    .achievement-copy span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: rgba(220, 251, 255, .64);
+      font-size: 11px;
+    }
+
     .server-chat {
       position: fixed;
       z-index: 4;
@@ -2395,6 +2469,27 @@
         height: 32px;
       }
 
+      .achievement-toast {
+        top: 124px;
+        width: calc(100vw - 28px);
+        grid-template-columns: 36px minmax(0, 1fr);
+        padding: 9px 10px;
+      }
+
+      .achievement-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+      }
+
+      .achievement-copy strong {
+        font-size: 13px;
+      }
+
+      .achievement-copy span {
+        font-size: 10px;
+      }
+
       .server-chat {
         left: 16px;
         right: 16px;
@@ -2680,6 +2775,15 @@
     <small id="bestScoreValue">纪录 0</small>
   </div>
 
+  <section id="achievementToast" class="achievement-toast" aria-label="战绩解锁" aria-live="polite">
+    <div class="achievement-icon" id="achievementIcon">★</div>
+    <div class="achievement-copy">
+      <b>Achievement</b>
+      <strong id="achievementTitle">战绩同步</strong>
+      <span id="achievementText">本地档案已更新</span>
+    </div>
+  </section>
+
   <div id="message" class="message" aria-live="polite"></div>
   <section id="inviteCard" class="invite-card" aria-label="小队邀请" aria-live="polite">
     <div class="invite-head"><b>Squad Invite</b><span id="inviteTimer">--s</span></div>
@@ -2893,6 +2997,10 @@ const comboText = document.querySelector("#comboText");
 const bestScoreValue = document.querySelector("#bestScoreValue");
 const radar = document.querySelector("#radar");
 const radarArrow = document.querySelector("#radarArrow");
+const achievementToast = document.querySelector("#achievementToast");
+const achievementIcon = document.querySelector("#achievementIcon");
+const achievementTitle = document.querySelector("#achievementTitle");
+const achievementText = document.querySelector("#achievementText");
 const message = document.querySelector("#message");
 const inviteCard = document.querySelector("#inviteCard");
 const inviteTimer = document.querySelector("#inviteTimer");
@@ -3057,6 +3165,12 @@ const storm = { intensity: 0, target: 0, timer: 24, duration: 0, drift: new THRE
 const mission = { index: -1, title: "", type: "", progress: 0, target: 1, timer: 0, reward: 0 };
 const leviathanState = { active: false, timer: 42, duration: 0, health: 0, maxHealth: 100, stun: 0, phase: 0, warning: 0 };
 const discoveries = { found: loadDiscoverySet(), lastName: "声呐图鉴", pulse: 0, panelOpen: false, rank: 0 };
+const achievementState = {
+  unlocked: loadAchievementSet(),
+  queue: [],
+  timer: 0,
+  activeId: ""
+};
 let discoveryCatalog = [];
 const biomeState = { current: null, target: null, strength: 0, entered: new Set(), pulse: 0 };
 const relicState = { completed: 0, pulse: 0 };
@@ -6302,6 +6416,22 @@ function safeSetLocal(key, value) {
   }
 }
 
+function loadAchievementSet() {
+  const raw = safeGetLocal("jellyfishAchievements", "");
+  if (!raw) return new Set();
+  try {
+    const ids = JSON.parse(raw);
+    if (Array.isArray(ids)) return new Set(ids.filter((id) => typeof id === "string" && id.length > 0));
+  } catch (error) {
+    // Keep compatibility with any early local builds that stored delimited ids.
+  }
+  return new Set(raw.split(",").map((id) => id.trim()).filter(Boolean));
+}
+
+function persistAchievements() {
+  safeSetLocal("jellyfishAchievements", JSON.stringify([...achievementState.unlocked]));
+}
+
 function persistDiscoveries() {
   safeSetLocal("jellyfishDiscoveries", JSON.stringify([...discoveries.found]));
 }
@@ -6790,6 +6920,7 @@ function acceptSquadInvite() {
   addServerChatLine("系统", `${gateway.pilot || "潜航员"} 已加入 ${sender} 的临时小队。`, "system");
   addServerChatLine(sender, "收到，我会贴侧翼跟随。");
   showMessage(`已加入 ${sender} 的临时小队`, 1300);
+  unlockAchievement("squadJoin");
   playSfx("upgrade", 0.64);
 }
 
@@ -9055,6 +9186,7 @@ function update(delta, time) {
   updateServerEventHud(delta);
   updateSquadInvite(delta);
   updateSquadHud(delta);
+  updateAchievements(delta);
   updateMovement(delta);
   updateBiome(delta, time);
   updateTide(delta, time);
@@ -10024,6 +10156,59 @@ function collectMemoryShard(shard) {
   setTimeout(() => placeMemoryShard(shard, Math.floor(Math.random() * 6)), 9000 + Math.random() * 5000);
 }
 
+const achievementCatalog = {
+  firstDive: { icon: "01", title: "首次下潜", text: "接入裂谷服务器并开始潜航。" },
+  squadJoin: { icon: "02", title: "临时小队", text: "接受一次来自频道玩家的小队邀请。" },
+  missionOne: { icon: "03", title: "委托完成", text: "完成第一项裂谷委托。" },
+  comboFive: { icon: "05", title: "连锁荧光", text: "把连击提升到 x5。" },
+  heartAwake: { icon: "H", title: "海心苏醒", text: "唤醒一次海沟之心。" },
+  stageTwo: { icon: "II", title: "第二潜层", text: "完成第一层裂谷并进入更深区域。" },
+  scoreTenK: { icon: "10K", title: "万分潜航", text: "单次档案得分达到 10000。" }
+};
+
+function unlockAchievement(id) {
+  const achievement = achievementCatalog[id];
+  if (!achievement || achievementState.unlocked.has(id)) return false;
+  achievementState.unlocked.add(id);
+  persistAchievements();
+  achievementState.queue.push({ id, ...achievement });
+  addServerChatLine("系统", `${gateway.pilot || "潜航员"} 解锁战绩：${achievement.title}。`, "system");
+  return true;
+}
+
+function showNextAchievement() {
+  if (achievementState.activeId || achievementState.queue.length <= 0) return;
+  const achievement = achievementState.queue.shift();
+  achievementState.activeId = achievement.id;
+  achievementState.timer = 3.4;
+  achievementIcon.textContent = achievement.icon;
+  achievementTitle.textContent = achievement.title;
+  achievementText.textContent = achievement.text;
+  achievementToast.classList.add("show");
+  playSfx("upgrade", 0.56);
+}
+
+function updateAchievements(delta) {
+  if (player.introOpen) return;
+  if (!achievementState.activeId) {
+    showNextAchievement();
+    return;
+  }
+  achievementState.timer -= delta;
+  if (achievementState.timer <= 0) {
+    achievementState.activeId = "";
+    achievementToast.classList.remove("show");
+    if (achievementState.queue.length > 0) setTimeout(showNextAchievement, 280);
+  }
+}
+
+function auditAchievementMilestones() {
+  if (!player.introOpen) unlockAchievement("firstDive");
+  if (player.combo >= 5) unlockAchievement("comboFive");
+  if (player.score >= 10000) unlockAchievement("scoreTenK");
+  if (player.stage >= 2) unlockAchievement("stageTwo");
+}
+
 function collectSpore(spore) {
   spore.collected = true;
   spore.group.visible = false;
@@ -10083,6 +10268,7 @@ function collectAbyssPearl(position) {
 function raiseCombo(amount) {
   player.combo = Math.min(tuning.maxCombo, (player.comboTimer > 0 ? player.combo : 1) + amount);
   player.comboTimer = tuning.comboWindow;
+  auditAchievementMilestones();
 }
 
 function resetCombo(reason) {
@@ -10099,6 +10285,7 @@ function updateScoreReadout() {
   }
   scoreValue.textContent = player.score.toLocaleString("zh-CN");
   bestScoreValue.textContent = `纪录 ${player.bestScore.toLocaleString("zh-CN")}`;
+  auditAchievementMilestones();
 }
 
 function awardScore(base, label) {
@@ -10162,6 +10349,7 @@ function completeMission() {
   playSfx("upgrade", 0.84);
   showMessage(`裂谷委托完成：${mission.title}`, 1300);
   addServerChatLine("系统", `${gateway.pilot || "潜航员"} 完成了裂谷委托：${mission.title}。`, "system");
+  unlockAchievement("missionOne");
   addTrailBurst(12, 1.35);
   flashScreen();
   setTimeout(() => startMission(), 900);
@@ -10200,6 +10388,7 @@ function openHeartGate() {
   addTrailBurst(18, 1.65);
   showMessage("海沟之心已苏醒，跟随雷达返回遗迹门。", 2600);
   addServerChatLine("系统", `${gateway.pilot || "潜航员"} 唤醒了海沟之心。`, "system");
+  unlockAchievement("heartAwake");
   flashScreen();
 }
 
@@ -10210,6 +10399,7 @@ function completeStage() {
   raiseCombo(2);
   awardScore(900, `第 ${player.stage} 潜层完成`);
   player.stage += 1;
+  auditAchievementMilestones();
   world.objective = Math.min(28, world.objective + 4);
   player.spores = 0;
   player.energy = player.maxEnergy;
