@@ -1416,6 +1416,90 @@
       font-size: 11px;
     }
 
+    .leaderboard-panel {
+      position: fixed;
+      z-index: 4;
+      left: 32px;
+      bottom: 236px;
+      width: min(342px, calc(100vw - 64px));
+      display: grid;
+      gap: 8px;
+      padding: 10px 11px;
+      color: rgba(226, 253, 255, .78);
+      background: linear-gradient(180deg, rgba(2, 13, 25, .5), rgba(2, 13, 25, .2));
+      border: 1px solid rgba(133, 235, 255, .18);
+      border-radius: 7px;
+      box-shadow: inset 0 0 18px rgba(121,244,255,.05), 0 0 22px rgba(0,0,0,.18);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .24s ease, transform .24s ease, border-color .2s ease;
+      text-shadow: 0 0 10px rgba(121,244,255,.2);
+    }
+
+    .leaderboard-panel.is-active {
+      opacity: .9;
+      transform: translateY(0);
+    }
+
+    .leaderboard-panel.hot {
+      border-color: rgba(255, 209, 130, .38);
+      box-shadow: inset 0 0 18px rgba(255,209,130,.06), 0 0 22px rgba(255,209,130,.1);
+    }
+
+    .leaderboard-head,
+    .leaderboard-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .leaderboard-head b {
+      color: var(--cyan);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .leaderboard-head span,
+    .leaderboard-row em {
+      color: rgba(220, 251, 255, .56);
+      font-size: 10px;
+      font-style: normal;
+      white-space: nowrap;
+    }
+
+    .leaderboard-list {
+      display: grid;
+      gap: 5px;
+    }
+
+    .leaderboard-row {
+      padding: 4px 0;
+      border-top: 1px solid rgba(133, 235, 255, .08);
+      font-size: 11px;
+    }
+
+    .leaderboard-row:first-child {
+      border-top: 0;
+    }
+
+    .leaderboard-row b {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: rgba(238, 255, 255, .9);
+      font-size: 11px;
+    }
+
+    .leaderboard-row.is-player b,
+    .leaderboard-row.is-player em {
+      color: var(--amber);
+    }
+
     .server-chat {
       position: fixed;
       z-index: 4;
@@ -2490,6 +2574,37 @@
         font-size: 10px;
       }
 
+      .leaderboard-panel {
+        left: 16px;
+        right: 150px;
+        bottom: 384px;
+        width: auto;
+        padding: 8px 9px;
+        gap: 5px;
+      }
+
+      .leaderboard-head b {
+        font-size: 10px;
+      }
+
+      .leaderboard-head span {
+        display: none;
+      }
+
+      .leaderboard-row {
+        padding: 3px 0;
+        font-size: 10px;
+      }
+
+      .leaderboard-row b,
+      .leaderboard-row em {
+        font-size: 9px;
+      }
+
+      .leaderboard-row:nth-child(n+4) {
+        display: none;
+      }
+
       .server-chat {
         left: 16px;
         right: 16px;
@@ -2785,6 +2900,10 @@
   </section>
 
   <div id="message" class="message" aria-live="polite"></div>
+  <section id="leaderboardPanel" class="leaderboard-panel" aria-label="频道排行">
+    <div class="leaderboard-head"><b>Channel Rank</b><span id="leaderboardStatus">同步中</span></div>
+    <div id="leaderboardList" class="leaderboard-list"></div>
+  </section>
   <section id="inviteCard" class="invite-card" aria-label="小队邀请" aria-live="polite">
     <div class="invite-head"><b>Squad Invite</b><span id="inviteTimer">--s</span></div>
     <div class="invite-copy">
@@ -3002,6 +3121,9 @@ const achievementIcon = document.querySelector("#achievementIcon");
 const achievementTitle = document.querySelector("#achievementTitle");
 const achievementText = document.querySelector("#achievementText");
 const message = document.querySelector("#message");
+const leaderboardPanel = document.querySelector("#leaderboardPanel");
+const leaderboardStatus = document.querySelector("#leaderboardStatus");
+const leaderboardList = document.querySelector("#leaderboardList");
 const inviteCard = document.querySelector("#inviteCard");
 const inviteTimer = document.querySelector("#inviteTimer");
 const inviteTitle = document.querySelector("#inviteTitle");
@@ -3170,6 +3292,14 @@ const achievementState = {
   queue: [],
   timer: 0,
   activeId: ""
+};
+const leaderboardState = {
+  rows: [],
+  activeServerId: "",
+  dayKey: "",
+  lastScore: -1,
+  pulse: 0,
+  timer: 0
 };
 let discoveryCatalog = [];
 const biomeState = { current: null, target: null, strength: 0, entered: new Set(), pulse: 0 };
@@ -6752,6 +6882,98 @@ function currentServerEvent(profile = activeSceneProfile, now = Date.now()) {
   };
 }
 
+function pseudoRandom(seed) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+function leaderboardDayKey(now = Date.now()) {
+  return `${Math.floor(now / 86400000)}`;
+}
+
+function buildLeaderboardRows(profile = activeSceneProfile) {
+  const names = [
+    ...(profile.remoteNames || []),
+    "Abyss_21",
+    "CoralSync",
+    "DriftPilot",
+    "EchoManta",
+    "PearlRunner",
+    "TideArchivist"
+  ];
+  const day = Number(leaderboardDayKey());
+  const rows = [...new Set(names)].slice(0, 7).map((name, index) => {
+    const seed = day * 31.7 + profile.depth * 0.11 + index * 9.23;
+    const base = 2600 + index * 760 + Math.floor(pseudoRandom(seed) * 5200);
+    return { name, score: base, self: false };
+  });
+  rows.push({ name: gateway.pilot || "Pilot", score: player.score, self: true });
+  const sorted = rows.sort((a, b) => b.score - a.score);
+  const topRows = sorted.slice(0, 6);
+  if (!topRows.some((row) => row.self)) {
+    const playerRow = sorted.find((row) => row.self);
+    if (playerRow) topRows[topRows.length - 1] = playerRow;
+  }
+  const mobilePreview = topRows.slice(0, 3);
+  if (!mobilePreview.some((row) => row.self)) {
+    const playerRow = topRows.find((row) => row.self);
+    if (playerRow) topRows[2] = playerRow;
+  }
+  return topRows;
+}
+
+function renderLeaderboard() {
+  leaderboardList.replaceChildren();
+  leaderboardState.rows.forEach((row, index) => {
+    const item = document.createElement("div");
+    item.className = `leaderboard-row${row.self ? " is-player" : ""}`;
+    const name = document.createElement("b");
+    name.textContent = `#${index + 1} ${row.name}`;
+    const score = document.createElement("em");
+    score.textContent = row.score.toLocaleString("zh-CN");
+    item.append(name, score);
+    leaderboardList.append(item);
+  });
+}
+
+function resetLeaderboard(profile = activeSceneProfile) {
+  leaderboardState.activeServerId = profile.id;
+  leaderboardState.dayKey = leaderboardDayKey();
+  leaderboardState.lastScore = -1;
+  leaderboardState.rows = buildLeaderboardRows(profile);
+  leaderboardState.pulse = 1;
+  renderLeaderboard();
+}
+
+function updateLeaderboard(delta) {
+  const active = !player.introOpen;
+  leaderboardPanel.classList.toggle("is-active", active);
+  if (!active) return;
+  if (leaderboardState.activeServerId !== activeSceneProfile.id || leaderboardState.dayKey !== leaderboardDayKey()) {
+    resetLeaderboard(activeSceneProfile);
+  }
+  leaderboardState.timer -= delta;
+  leaderboardState.pulse = Math.max(0, leaderboardState.pulse - delta * 1.6);
+  if (leaderboardState.timer > 0 && leaderboardState.lastScore === player.score) {
+    leaderboardPanel.classList.toggle("hot", leaderboardState.pulse > 0.05);
+    return;
+  }
+  leaderboardState.timer = 1.2;
+  const previousRank = leaderboardState.rows.findIndex((row) => row.self);
+  leaderboardState.rows = buildLeaderboardRows(activeSceneProfile);
+  leaderboardState.lastScore = player.score;
+  const rank = leaderboardState.rows.findIndex((row) => row.self);
+  leaderboardStatus.textContent = rank >= 0
+    ? `你在本频道 #${rank + 1}`
+    : "冲榜中";
+  if (rank >= 0 && previousRank >= 0 && rank < previousRank) {
+    leaderboardState.pulse = 1;
+    addServerChatLine("系统", `${gateway.pilot || "潜航员"} 冲到频道排行 #${rank + 1}。`, "system");
+  }
+  renderLeaderboard();
+  leaderboardPanel.classList.toggle("hot", leaderboardState.pulse > 0.05);
+}
+
 function addServerChatLine(author, text, type = "remote") {
   if (!chatLog) return;
   const line = document.createElement("div");
@@ -7106,6 +7328,7 @@ function applySceneProfile(id, movePlayer = true) {
   retintAmbientLife(profile);
   serverEventState.activeKey = "";
   serverEventState.hudText = "";
+  resetLeaderboard(profile);
   resetServerChat(profile);
   resetSquadPanel(profile);
   if (movePlayer) {
@@ -9187,6 +9410,7 @@ function update(delta, time) {
   updateSquadInvite(delta);
   updateSquadHud(delta);
   updateAchievements(delta);
+  updateLeaderboard(delta);
   updateMovement(delta);
   updateBiome(delta, time);
   updateTide(delta, time);
