@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>深海水母漫游 - 海渊通行证</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23010712'/%3E%3Cpath d='M14 30c1-12 9-19 18-19s17 7 18 19c-6 6-30 6-36 0z' fill='%237af4ff'/%3E%3Cpath d='M20 35c-5 7 1 11-3 18M29 36c-2 8 3 11 0 18M38 36c2 8-3 11 0 18M47 35c5 7-1 11 3 18' stroke='%23b99cff' stroke-width='4' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
   <style>
     :root {
       color-scheme: dark;
@@ -375,6 +376,14 @@
       line-height: 1.55;
     }
 
+    .summary .broadcast-line {
+      color: rgba(118, 255, 210, .72);
+    }
+
+    .summary .event-line {
+      color: rgba(255, 209, 130, .82);
+    }
+
     .enter {
       width: 100%;
       min-height: 54px;
@@ -391,6 +400,61 @@
       .lead { font-size: 15px; }
       .rift { opacity: .64; height: 190px; }
       .jelly { transform: scale(.74); bottom: 48px; }
+
+      body[data-screen="server"] {
+        min-height: 100vh;
+        padding: 10px;
+      }
+
+      body[data-screen="server"] .shell {
+        gap: 10px;
+      }
+
+      body[data-screen="server"] .scene {
+        min-height: 112px;
+        padding: 16px;
+      }
+
+      body[data-screen="server"] .brand {
+        gap: 8px;
+      }
+
+      body[data-screen="server"] .kicker {
+        font-size: 10px;
+      }
+
+      body[data-screen="server"] h1 {
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      body[data-screen="server"] .lead,
+      body[data-screen="server"] .rift {
+        display: none;
+      }
+
+      body[data-screen="server"] .panel {
+        padding: 16px;
+        gap: 12px;
+      }
+
+      body[data-screen="server"] .panel-head {
+        display: none;
+      }
+
+      body[data-screen="server"] .server {
+        padding: 11px;
+        gap: 8px;
+      }
+
+      body[data-screen="server"] .summary {
+        font-size: 12px;
+        line-height: 1.42;
+      }
+
+      body[data-screen="server"] .enter {
+        min-height: 50px;
+      }
     }
   </style>
 </head>
@@ -506,6 +570,14 @@
         basePing: 74
       }
     ];
+    const SERVER_EVENT_WINDOW_MS = 9 * 60 * 1000;
+    const serverEventCatalog = [
+      { id: "spore-tide", name: "荧光潮涌", detail: "孢子迁移路线稳定" },
+      { id: "relic-echo", name: "遗迹回声", detail: "归档小队正在集结" },
+      { id: "pearl-drift", name: "珍珠漂流", detail: "高值信号刷新偏高" },
+      { id: "sanctuary-link", name: "圣所联调", detail: "补给标记同步中" },
+      { id: "shadow-watch", name: "幽影巡游", detail: "频道建议结伴潜航" }
+    ];
 
     const state = {
       screen: "register",
@@ -565,8 +637,40 @@
       return { load, label: "流畅", className: "" };
     }
 
+    function dailyAbyssBroadcast(server) {
+      const dayKey = Math.floor(Date.now() / 86400000);
+      const seed = Math.abs(Math.sin(dayKey * 17.31 + server.depth * 0.013));
+      const weather = ["低频风暴窗口缩短", "荧光孢子密度上升", "圣所回声稳定", "珍珠反噬偏低", "晶体回声增强"];
+      const objective = ["完成 2 次裂谷委托", "归档 3 个声呐信号", "上传 6 份研究样本", "稳定 1 座回声遗迹", "封存 1 个危险回声"];
+      const reward = ["样本舱优先调度", "声呐冷却补偿", "小队同步增幅", "圣所补给标记", "海图路线加权"];
+      const pick = (items, offset) => items[Math.floor(((seed + offset) % 1) * items.length)];
+      return `今日播报：${pick(weather, 0.17)} · ${pick(objective, 0.41)} · ${pick(reward, 0.73)}`;
+    }
+
+    function formatServerEventCountdown(ms) {
+      const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+      const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+      const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+      return `${minutes}:${seconds}`;
+    }
+
+    function currentServerEvent(server, now = Date.now()) {
+      const slot = Math.floor(now / SERVER_EVENT_WINDOW_MS);
+      const remainingMs = SERVER_EVENT_WINDOW_MS - (now % SERVER_EVENT_WINDOW_MS);
+      const seed = Math.abs(Math.sin(slot * 19.73 + server.depth * 0.021));
+      const event = serverEventCatalog[Math.floor(seed * serverEventCatalog.length) % serverEventCatalog.length];
+      return {
+        ...event,
+        key: `${server.id}:${slot}:${event.id}`,
+        countdown: formatServerEventCountdown(remainingMs),
+        remainingMs,
+        text: `限时事件：${event.name} ${formatServerEventCountdown(remainingMs)} · ${event.detail}`
+      };
+    }
+
     function setScreen(screen) {
       state.screen = screen;
+      document.body.dataset.screen = screen;
       tabs.hidden = screen === "server";
       loginView.classList.toggle("is-active", screen === "login");
       registerView.classList.toggle("is-active", screen === "register");
@@ -634,11 +738,28 @@
         button.classList.toggle("is-selected", server.id === state.selectedServerId);
         button.style.setProperty("--load", serverState.load.toFixed(3));
         button.setAttribute("aria-pressed", `${server.id === state.selectedServerId}`);
-        button.innerHTML = `
-          <span class="server-top"><b>${server.name}</b><em>${server.region} · ${server.sceneName}</em></span>
-          <span class="load"><i></i></span>
-          <span class="server-bottom"><span>${server.population} 人在线 · ${server.depth}m</span><strong>${serverState.label}</strong></span>
-        `;
+
+        const top = document.createElement("span");
+        top.className = "server-top";
+        const name = document.createElement("b");
+        name.textContent = server.name;
+        const region = document.createElement("em");
+        region.textContent = `${server.region} · ${server.sceneName}`;
+        top.append(name, region);
+
+        const load = document.createElement("span");
+        load.className = "load";
+        load.append(document.createElement("i"));
+
+        const bottom = document.createElement("span");
+        bottom.className = "server-bottom";
+        const population = document.createElement("span");
+        population.textContent = `${server.population} 人在线 · ${server.depth}m`;
+        const label = document.createElement("strong");
+        label.textContent = serverState.label;
+        bottom.append(population, label);
+
+        button.append(top, load, bottom);
         button.addEventListener("click", () => {
           state.selectedServerId = server.id;
           localStorage.setItem(SERVER_KEY, server.id);
@@ -657,7 +778,16 @@
     function updateSummary() {
       const server = getSelectedServer();
       const serverState = getServerState(server);
-      summary.textContent = `${server.name} · ${server.sceneName} · ${server.depth}m · ${serverState.label} · ${server.population} 人在线 · 延迟 ${server.ping}ms`;
+      const summaryLine = document.createElement("span");
+      summaryLine.textContent = `${server.name} · ${server.sceneName} · ${server.depth}m · ${serverState.label} · ${server.population} 人在线 · 延迟 ${server.ping}ms`;
+      const broadcastLine = document.createElement("span");
+      broadcastLine.className = "broadcast-line";
+      broadcastLine.textContent = dailyAbyssBroadcast(server);
+      const event = currentServerEvent(server);
+      const eventLine = document.createElement("span");
+      eventLine.className = "event-line";
+      eventLine.textContent = event.text;
+      summary.replaceChildren(summaryLine, document.createElement("br"), broadcastLine, document.createElement("br"), eventLine);
       enterButton.disabled = !server;
     }
 
@@ -689,6 +819,8 @@
         region: server.region,
         population: server.population,
         ping: server.ping,
+        broadcast: dailyAbyssBroadcast(server),
+        serverEvent: currentServerEvent(server).text,
         issuedAt: Date.now()
       };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -736,6 +868,9 @@
     });
 
     window.setInterval(refreshPopulations, 3400);
+    window.setInterval(() => {
+      if (state.screen === "server") updateSummary();
+    }, 1000);
   </script>
 </body>
 </html>

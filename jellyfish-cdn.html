@@ -929,10 +929,78 @@
       box-shadow: 0 0 12px rgba(255,209,130,.62);
     }
 
-    .squad-panel {
+    .event-strip {
       position: fixed;
       right: 48px;
       top: 304px;
+      z-index: 4;
+      width: min(330px, calc(100vw - 96px));
+      display: grid;
+      gap: 5px;
+      padding: 9px 10px;
+      color: rgba(226, 253, 255, .72);
+      background: linear-gradient(180deg, rgba(2, 13, 25, .46), rgba(2, 13, 25, .2));
+      border: 1px solid rgba(255, 209, 130, .2);
+      border-radius: 7px;
+      box-shadow: inset 0 0 18px rgba(255,209,130,.04), 0 0 22px rgba(0,0,0,.14);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .24s ease, transform .24s ease, border-color .2s ease;
+      text-shadow: 0 0 10px rgba(255,209,130,.18);
+    }
+
+    .event-strip.is-active {
+      opacity: .9;
+      transform: translateY(0);
+    }
+
+    .event-strip.hot {
+      border-color: rgba(255, 209, 130, .46);
+      box-shadow: inset 0 0 18px rgba(255,209,130,.07), 0 0 22px rgba(255,209,130,.12);
+    }
+
+    .event-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .event-head b {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--amber);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .event-head span {
+      color: rgba(255, 235, 194, .74);
+      font-size: 10px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .event-detail {
+      margin: 0;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: rgba(220, 251, 255, .56);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .squad-panel {
+      position: fixed;
+      right: 48px;
+      top: 378px;
       z-index: 4;
       width: min(330px, calc(100vw - 96px));
       display: grid;
@@ -1908,6 +1976,14 @@
       line-height: 1.45;
     }
 
+    .server-summary .broadcast-line {
+      color: rgba(118, 255, 210, .68);
+    }
+
+    .server-summary .event-line {
+      color: rgba(255, 209, 130, .8);
+    }
+
     .audio-toggle {
       position: fixed;
       z-index: 7;
@@ -2157,11 +2233,30 @@
         width: calc(100vw - 156px);
       }
 
-      .squad-panel {
+      .event-strip {
         left: 16px;
         right: 150px;
         top: auto;
         bottom: 258px;
+        width: auto;
+        padding: 7px 8px;
+        gap: 4px;
+      }
+
+      .event-head b {
+        font-size: 10px;
+      }
+
+      .event-head span,
+      .event-detail {
+        font-size: 9px;
+      }
+
+      .squad-panel {
+        left: 16px;
+        right: 150px;
+        top: auto;
+        bottom: 322px;
         width: auto;
         padding: 8px 9px;
         gap: 6px;
@@ -2442,6 +2537,11 @@
     <div class="mission-bar"><span id="missionFill"></span></div>
   </div>
 
+  <section id="eventStrip" class="event-strip" aria-label="服务器事件">
+    <div class="event-head"><b id="eventName">服务器事件</b><span id="eventTimer">--:--</span></div>
+    <p id="eventDetail" class="event-detail">等待频道同步</p>
+  </section>
+
   <section id="squadPanel" class="squad-panel" aria-label="队伍同步">
     <div class="squad-head"><b>队伍同步</b><span id="squadServer">2/4 小队</span></div>
     <div class="squad-member">
@@ -2649,6 +2749,10 @@ const objectiveLabel = document.querySelector("#objectiveLabel");
 const missionLabel = document.querySelector("#missionLabel");
 const missionProgress = document.querySelector("#missionProgress");
 const missionFill = document.querySelector("#missionFill");
+const eventStrip = document.querySelector("#eventStrip");
+const eventName = document.querySelector("#eventName");
+const eventTimer = document.querySelector("#eventTimer");
+const eventDetail = document.querySelector("#eventDetail");
 const squadPanel = document.querySelector("#squadPanel");
 const squadServer = document.querySelector("#squadServer");
 const squadName = document.querySelector("#squadName");
@@ -2963,6 +3067,7 @@ const performanceState = {
   quality: 1,
   effectLoad: 0,
   hudCooldown: 0,
+  objectiveText: "",
   pixelRatio: basePixelRatio,
   pixelTimer: 0
 };
@@ -3026,6 +3131,14 @@ const serverCatalog = [
   { id: "night-reef", name: "二区 · 夜光礁", region: "华北", sceneId: "night-reef", sceneName: "夜光礁海", depth: 1320, ping: 42 },
   { id: "silent-tide", name: "三区 · 静潮湾", region: "国际", sceneId: "silent-tide", sceneName: "静潮深湾", depth: 1760, ping: 74 }
 ];
+const SERVER_EVENT_WINDOW_MS = 9 * 60 * 1000;
+const serverEventCatalog = [
+  { id: "spore-tide", name: "荧光潮涌", detail: "孢子迁移路线稳定", chat: "荧光潮涌已开始，孢子迁移路线稳定。" },
+  { id: "relic-echo", name: "遗迹回声", detail: "归档小队正在集结", chat: "遗迹回声进入活跃窗口，归档小队正在集结。" },
+  { id: "pearl-drift", name: "珍珠漂流", detail: "高值信号刷新偏高", chat: "珍珠漂流窗口开启，高值信号刷新偏高。" },
+  { id: "sanctuary-link", name: "圣所联调", detail: "补给标记同步中", chat: "圣所联调已同步，补给标记正在刷新。" },
+  { id: "shadow-watch", name: "幽影巡游", detail: "频道建议结伴潜航", chat: "幽影巡游预警，频道建议结伴潜航。" }
+];
 const gateway = {
   screen: "login",
   pilot: safeGetLocal("jellyfishPilot", ""),
@@ -3048,6 +3161,12 @@ const squadState = {
   sync: 0.72,
   pulse: 0,
   pingTimer: 10
+};
+const serverEventState = {
+  activeKey: "",
+  announceKey: "",
+  pulse: 0,
+  hudText: ""
 };
 const player = {
   group: new THREE.Group(),
@@ -6305,6 +6424,61 @@ function selectedServerForProfile(profile = activeSceneProfile) {
   return gateway.servers.find((server) => server.sceneId === profile.id || server.id === profile.id) || gateway.servers[0];
 }
 
+function dailyAbyssBroadcast(profile = activeSceneProfile) {
+  const dayKey = Math.floor(Date.now() / 86400000);
+  const seed = Math.abs(Math.sin(dayKey * 17.31 + profile.depth * 0.013));
+  const weather = [
+    "低频风暴窗口缩短",
+    "荧光孢子密度上升",
+    "圣所回声稳定",
+    "珍珠反噬偏低",
+    "晶体回声增强"
+  ];
+  const objective = [
+    "完成 2 次裂谷委托",
+    "归档 3 个声呐信号",
+    "上传 6 份研究样本",
+    "稳定 1 座回声遗迹",
+    "封存 1 个危险回声"
+  ];
+  const reward = [
+    "样本舱优先调度",
+    "声呐冷却补偿",
+    "小队同步增幅",
+    "圣所补给标记",
+    "海图路线加权"
+  ];
+  const pick = (items, offset) => items[Math.floor(((seed + offset) % 1) * items.length)];
+  return {
+    weather: pick(weather, 0.17),
+    objective: pick(objective, 0.41),
+    reward: pick(reward, 0.73),
+    text: `今日播报：${pick(weather, 0.17)} · ${pick(objective, 0.41)} · ${pick(reward, 0.73)}`
+  };
+}
+
+function formatServerEventCountdown(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function currentServerEvent(profile = activeSceneProfile, now = Date.now()) {
+  const slot = Math.floor(now / SERVER_EVENT_WINDOW_MS);
+  const remainingMs = SERVER_EVENT_WINDOW_MS - (now % SERVER_EVENT_WINDOW_MS);
+  const seed = Math.abs(Math.sin(slot * 19.73 + profile.depth * 0.021));
+  const event = serverEventCatalog[Math.floor(seed * serverEventCatalog.length) % serverEventCatalog.length];
+  const countdown = formatServerEventCountdown(remainingMs);
+  return {
+    ...event,
+    key: `${profile.id}:${slot}:${event.id}`,
+    countdown,
+    remainingMs,
+    text: `限时事件：${event.name} ${countdown} · ${event.detail}`
+  };
+}
+
 function addServerChatLine(author, text, type = "remote") {
   if (!chatLog) return;
   const line = document.createElement("div");
@@ -6343,8 +6517,13 @@ function resetServerChat(profile = activeSceneProfile) {
   chatInput.value = "";
   setChatWriting(false);
   const server = selectedServerForProfile(profile);
+  const broadcast = dailyAbyssBroadcast(profile);
+  const event = currentServerEvent(profile);
+  serverEventState.announceKey = event.key;
   chatStatus.textContent = `${profile.name} · ${server.population} 在线`;
   addServerChatLine("系统", `${profile.name} 频道已连接，当前 ${server.population} 人在线。`, "system");
+  addServerChatLine("系统", broadcast.text, "system");
+  addServerChatLine("系统", event.text, "system");
   const names = chatRoster(profile);
   const starter = profile.chatLines || sceneProfiles["blue-rift"].chatLines;
   addServerChatLine(names[0] || "Abyss", starter[THREE.MathUtils.randInt(0, starter.length - 1)]);
@@ -6389,6 +6568,33 @@ function updateServerChat(delta) {
     pushAutoServerChat();
     chatState.timer = THREE.MathUtils.randFloat(7.5, 14.5);
   }
+}
+
+function updateServerEventHud(delta) {
+  const active = !player.introOpen;
+  eventStrip.classList.toggle("is-active", active);
+  if (!active) return;
+
+  serverEventState.pulse = Math.max(0, serverEventState.pulse - delta * 1.9);
+  const event = currentServerEvent(activeSceneProfile);
+  if (event.key !== serverEventState.activeKey) {
+    serverEventState.activeKey = event.key;
+    serverEventState.hudText = "";
+    serverEventState.pulse = 1;
+    if (serverEventState.announceKey !== event.key) {
+      serverEventState.announceKey = event.key;
+      addServerChatLine("系统", event.chat, "system");
+    }
+  }
+
+  const nextText = `${event.name}|${event.countdown}|${event.detail}`;
+  if (nextText !== serverEventState.hudText) {
+    eventName.textContent = event.name;
+    eventTimer.textContent = event.countdown;
+    eventDetail.textContent = event.detail;
+    serverEventState.hudText = nextText;
+  }
+  eventStrip.classList.toggle("hot", serverEventState.pulse > 0.05 || event.remainingMs < 60000);
 }
 
 function submitChatMessage() {
@@ -6540,6 +6746,8 @@ function applySceneProfile(id, movePlayer = true) {
   applySceneAtmosphere(profile.id);
   applySceneRemoteIdentity(profile);
   retintAmbientLife(profile);
+  serverEventState.activeKey = "";
+  serverEventState.hudText = "";
   resetServerChat(profile);
   resetSquadPanel(profile);
   if (movePlayer) {
@@ -6794,7 +7002,17 @@ function updateServerSummary() {
   }
   const state = getGatewayServerState(server);
   const profile = sceneProfileFor(server.sceneId || server.id);
-  serverSummary.textContent = `${server.name} · ${profile.name} · ${profile.depth}m · ${state.label} · ${server.population.toLocaleString("zh-CN")} 人在线 · 延迟 ${server.ping}ms`;
+  const broadcast = dailyAbyssBroadcast(profile);
+  const event = currentServerEvent(profile);
+  const summaryLine = document.createElement("span");
+  summaryLine.textContent = `${server.name} · ${profile.name} · ${profile.depth}m · ${state.label} · ${server.population.toLocaleString("zh-CN")} 人在线 · 延迟 ${server.ping}ms`;
+  const broadcastLine = document.createElement("span");
+  broadcastLine.className = "broadcast-line";
+  broadcastLine.textContent = broadcast.text;
+  const eventLine = document.createElement("span");
+  eventLine.className = "event-line";
+  eventLine.textContent = event.text;
+  serverSummary.replaceChildren(summaryLine, document.createElement("br"), broadcastLine, document.createElement("br"), eventLine);
   introStart.disabled = gateway.connecting;
 }
 
@@ -7855,7 +8073,7 @@ function renderCodexPanel() {
   codexProgress.textContent = `${discoveries.found.size}/${discoveryCatalog.length} 记录`;
   const nextThreshold = discoveries.rank >= 3 ? "研究完成" : `${[3, 6, 10][discoveries.rank]} 项记录解锁下一阶层`;
   codexReward.textContent = `研究阶层 ${discoveries.rank} · ${nextThreshold}`;
-  codexGrid.innerHTML = "";
+  codexGrid.replaceChildren();
   discoveryCatalog.forEach((entry) => {
     const found = discoveries.found.has(entry.id);
     const pinned = codexRouteState.pinnedId === entry.id;
@@ -7867,7 +8085,14 @@ function renderCodexPanel() {
     item.setAttribute("aria-label", `${found ? entry.name : "未记录回声"} ${pinned ? "路线已钉选" : "图鉴路线"}`);
     item.style.setProperty("--entry-color", hexCss(entry.color));
     const clue = codexEntryClue(entry, found, pinned);
-    item.innerHTML = `<b>${found ? entry.name : "未记录回声"}</b><span>${found ? `+${entry.points} 研究点 · 已归档` : "用声呐靠近生态目标以记录"}</span><span class="codex-clue">${clue}</span>`;
+    const title = document.createElement("b");
+    title.textContent = found ? entry.name : "未记录回声";
+    const meta = document.createElement("span");
+    meta.textContent = found ? `+${entry.points} 研究点 · 已归档` : "用声呐靠近生态目标以记录";
+    const clueText = document.createElement("span");
+    clueText.className = "codex-clue";
+    clueText.textContent = clue;
+    item.append(title, meta, clueText);
     codexGrid.appendChild(item);
   });
 }
@@ -8568,6 +8793,7 @@ function loop() {
 function update(delta, time) {
   updateGateway(delta);
   updateServerChat(delta);
+  updateServerEventHud(delta);
   updateSquadHud(delta);
   updateMovement(delta);
   updateBiome(delta, time);
@@ -9746,12 +9972,16 @@ function offerUpgradeChoices() {
     const upgrade = upgradeCatalog[THREE.MathUtils.randInt(0, upgradeCatalog.length - 1)];
     if (!options.includes(upgrade)) options.push(upgrade);
   }
-  upgradeOptions.innerHTML = "";
+  upgradeOptions.replaceChildren();
   options.forEach((upgrade) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "upgrade-option";
-    button.innerHTML = `<b>${upgrade.name}</b><span>${upgrade.text}</span>`;
+    const name = document.createElement("b");
+    name.textContent = upgrade.name;
+    const text = document.createElement("span");
+    text.textContent = upgrade.text;
+    button.append(name, text);
     button.addEventListener("click", () => {
       playSfx("click", 0.8);
       chooseUpgrade(upgrade);
@@ -10181,9 +10411,18 @@ function updateHud(delta) {
   sporeValue.textContent = `${Math.min(player.spores, world.objective)}/${world.objective}`;
   comboValue.textContent = `x${player.combo}`;
   const remaining = Math.max(0, world.objective - Math.min(player.spores, world.objective));
-  objectiveLabel.innerHTML = player.gateOpened
-    ? `回到 <strong>海沟之心</strong>`
-    : `第 ${player.stage} 潜层 · 收集 <b>${remaining}</b> 个荧光孢子`;
+  const objectiveText = player.gateOpened ? "gate" : `${player.stage}:${remaining}`;
+  if (objectiveText !== performanceState.objectiveText && player.gateOpened) {
+    const target = document.createElement("strong");
+    target.textContent = "海沟之心";
+    objectiveLabel.replaceChildren("回到 ", target);
+    performanceState.objectiveText = objectiveText;
+  } else if (objectiveText !== performanceState.objectiveText) {
+    const count = document.createElement("b");
+    count.textContent = `${remaining}`;
+    objectiveLabel.replaceChildren(`第 ${player.stage} 潜层 · 收集 `, count, " 个荧光孢子");
+    performanceState.objectiveText = objectiveText;
+  }
   if (player.combo <= 1 && player.comboTimer <= 0 && player.energy > 25) {
     if (player.upgradeOpen) {
       comboText.textContent = "选择海沟记忆";
