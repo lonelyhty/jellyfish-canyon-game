@@ -1248,6 +1248,100 @@
       transform: translate(-50%, -50%) scale(1);
     }
 
+    .invite-card {
+      position: fixed;
+      z-index: 6;
+      right: 48px;
+      bottom: 42px;
+      width: min(332px, calc(100vw - 96px));
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      color: rgba(235, 253, 255, .9);
+      background: linear-gradient(180deg, rgba(2, 13, 25, .78), rgba(2, 13, 25, .52));
+      border: 1px solid rgba(118, 255, 210, .28);
+      border-radius: 8px;
+      box-shadow: inset 0 0 22px rgba(118,255,210,.06), 0 18px 42px rgba(0,0,0,.28);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(12px) scale(.98);
+      transition: opacity .22s ease, transform .22s ease, border-color .2s ease;
+      text-shadow: 0 0 12px rgba(118,255,210,.18);
+    }
+
+    .invite-card.is-active {
+      opacity: .96;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+
+    .invite-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .invite-head b {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--mint);
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .invite-head span {
+      color: rgba(220, 251, 255, .58);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .invite-copy {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .invite-copy strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+      font-size: 15px;
+    }
+
+    .invite-copy span {
+      color: rgba(220, 251, 255, .64);
+      font-size: 11px;
+      line-height: 1.42;
+    }
+
+    .invite-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .invite-actions button {
+      height: 34px;
+      border: 1px solid rgba(133, 235, 255, .28);
+      border-radius: 6px;
+      color: var(--text);
+      background: rgba(3, 16, 27, .72);
+      font: 800 12px/1 Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      cursor: pointer;
+    }
+
+    .invite-actions button:first-child {
+      border-color: rgba(118, 255, 210, .54);
+      background: linear-gradient(135deg, rgba(118,255,210,.22), rgba(121,244,255,.14));
+      box-shadow: 0 0 18px rgba(118,255,210,.1);
+    }
+
     .server-chat {
       position: fixed;
       z-index: 4;
@@ -2280,6 +2374,27 @@
         font-size: 11px;
       }
 
+      .invite-card {
+        left: 16px;
+        right: 16px;
+        top: 292px;
+        bottom: auto;
+        width: auto;
+        padding: 10px;
+      }
+
+      .invite-copy strong {
+        font-size: 13px;
+      }
+
+      .invite-copy span {
+        font-size: 10px;
+      }
+
+      .invite-actions button {
+        height: 32px;
+      }
+
       .server-chat {
         left: 16px;
         right: 16px;
@@ -2566,6 +2681,17 @@
   </div>
 
   <div id="message" class="message" aria-live="polite"></div>
+  <section id="inviteCard" class="invite-card" aria-label="小队邀请" aria-live="polite">
+    <div class="invite-head"><b>Squad Invite</b><span id="inviteTimer">--s</span></div>
+    <div class="invite-copy">
+      <strong id="inviteTitle">等待小队信号</strong>
+      <span id="inviteText">频道正在同步。</span>
+    </div>
+    <div class="invite-actions">
+      <button id="inviteAccept" type="button">接受</button>
+      <button id="inviteLater" type="button">稍后</button>
+    </div>
+  </section>
   <section id="serverChat" class="server-chat" aria-label="服务器频道">
     <div class="chat-head">Server Channel <span id="chatStatus">离线</span></div>
     <div id="chatLog" class="chat-log" aria-live="polite"></div>
@@ -2768,6 +2894,12 @@ const bestScoreValue = document.querySelector("#bestScoreValue");
 const radar = document.querySelector("#radar");
 const radarArrow = document.querySelector("#radarArrow");
 const message = document.querySelector("#message");
+const inviteCard = document.querySelector("#inviteCard");
+const inviteTimer = document.querySelector("#inviteTimer");
+const inviteTitle = document.querySelector("#inviteTitle");
+const inviteText = document.querySelector("#inviteText");
+const inviteAccept = document.querySelector("#inviteAccept");
+const inviteLater = document.querySelector("#inviteLater");
 const serverChat = document.querySelector("#serverChat");
 const chatStatus = document.querySelector("#chatStatus");
 const chatLog = document.querySelector("#chatLog");
@@ -3160,7 +3292,17 @@ const squadState = {
   status: "跟随中",
   sync: 0.72,
   pulse: 0,
-  pingTimer: 10
+  pingTimer: 10,
+  accepted: false,
+  joinedName: ""
+};
+const inviteState = {
+  active: false,
+  timer: 0,
+  cooldown: 9,
+  sender: "",
+  serverId: "",
+  offered: 0
 };
 const serverEventState = {
   activeKey: "",
@@ -3215,6 +3357,7 @@ const player = {
 const music = {
   enabled: true,
   started: false,
+  userActivated: false,
   context: null,
   master: null,
   padGain: null,
@@ -6612,12 +6755,93 @@ function submitChatMessage() {
   playSfx("click", 0.45);
 }
 
+function closeSquadInvite() {
+  inviteState.active = false;
+  inviteState.timer = 0;
+  inviteCard.classList.remove("is-active");
+}
+
+function showSquadInvite(profile = activeSceneProfile) {
+  if (inviteState.active || squadState.accepted || player.introOpen) return;
+  const server = selectedServerForProfile(profile);
+  const names = chatRoster(profile);
+  const sender = remotePlayer?.name || names[0] || "Abyss_09";
+  inviteState.active = true;
+  inviteState.timer = 14;
+  inviteState.sender = sender;
+  inviteState.serverId = profile.id;
+  inviteState.offered += 1;
+  inviteTitle.textContent = `${sender} 邀请你加入临时小队`;
+  inviteText.textContent = `${server.name.replace(/^.*?·\s*/, "")} · ${server.population} 人在线 · 接受后同步侧翼脉冲。`;
+  inviteTimer.textContent = `${Math.ceil(inviteState.timer)}s`;
+  inviteCard.classList.add("is-active");
+  addServerChatLine(sender, "要一起跑这条裂谷线吗？我发了小队邀请。");
+}
+
+function acceptSquadInvite() {
+  if (!inviteState.active) return;
+  const sender = inviteState.sender || remotePlayer?.name || "Abyss_09";
+  squadState.accepted = true;
+  squadState.joinedName = sender;
+  squadState.status = "小队已就绪";
+  squadState.sync = Math.max(squadState.sync, 0.86);
+  squadState.pulse = 1.2;
+  closeSquadInvite();
+  addServerChatLine("系统", `${gateway.pilot || "潜航员"} 已加入 ${sender} 的临时小队。`, "system");
+  addServerChatLine(sender, "收到，我会贴侧翼跟随。");
+  showMessage(`已加入 ${sender} 的临时小队`, 1300);
+  playSfx("upgrade", 0.64);
+}
+
+function deferSquadInvite() {
+  if (!inviteState.active) return;
+  const sender = inviteState.sender || "队友";
+  closeSquadInvite();
+  inviteState.cooldown = THREE.MathUtils.randFloat(26, 42);
+  addServerChatLine(sender, "没事，我先在附近跟一下。");
+  showMessage("已暂缓小队邀请。", 900);
+  playSfx("click", 0.46);
+}
+
+function updateSquadInvite(delta) {
+  const active = !player.introOpen && !player.upgradeOpen;
+  if (!active) {
+    inviteCard.classList.remove("is-active");
+    return;
+  }
+  if (squadState.accepted) {
+    closeSquadInvite();
+    return;
+  }
+  if (inviteState.active) {
+    inviteState.timer -= delta;
+    inviteTimer.textContent = `${Math.max(0, Math.ceil(inviteState.timer))}s`;
+    if (inviteState.timer <= 0) {
+      closeSquadInvite();
+      inviteState.cooldown = THREE.MathUtils.randFloat(24, 38);
+      addServerChatLine(inviteState.sender || "队友", "邀请先撤回，我继续在侧翼。");
+    }
+    return;
+  }
+  inviteState.cooldown -= delta;
+  if (inviteState.cooldown <= 0) {
+    showSquadInvite(activeSceneProfile);
+    inviteState.cooldown = THREE.MathUtils.randFloat(34, 54);
+  }
+}
+
 function resetSquadPanel(profile = activeSceneProfile) {
   squadState.activeServerId = profile.id;
   squadState.status = "跟随中";
   squadState.sync = 0.72;
   squadState.pulse = 1;
   squadState.pingTimer = THREE.MathUtils.randFloat(8, 14);
+  squadState.accepted = false;
+  squadState.joinedName = "";
+  inviteState.active = false;
+  inviteState.cooldown = THREE.MathUtils.randFloat(5.5, 9.5);
+  inviteState.serverId = profile.id;
+  inviteCard.classList.remove("is-active");
   squadName.textContent = remotePlayer?.name || chatRoster(profile)[0] || "Abyss_09";
   updateSquadHud(0);
 }
@@ -6652,13 +6876,16 @@ function updateSquadHud(delta) {
 
   const server = selectedServerForProfile(activeSceneProfile);
   const distance = remotePlayer.group.position.distanceTo(player.group.position);
-  const targetSync = THREE.MathUtils.clamp(1 - distance / 72 + remotePlayer.pulse * 0.12, 0.18, 1);
+  const acceptedBonus = squadState.accepted ? 0.14 : 0;
+  const targetSync = THREE.MathUtils.clamp(1 - distance / 72 + remotePlayer.pulse * 0.12 + acceptedBonus, 0.18, 1);
   squadState.sync = THREE.MathUtils.lerp(squadState.sync, targetSync, 1 - Math.pow(0.03, delta || 0.016));
-  squadState.status = squadStatusText(distance);
+  squadState.status = squadState.accepted ? `小队同步 ${Math.round(squadState.sync * 100)}%` : squadStatusText(distance);
   squadState.pulse = Math.max(0, squadState.pulse - delta * 1.5);
 
-  squadServer.textContent = `${server.name.replace(/^.*?·\s*/, "")} · 2/${server.population > 32 ? 4 : 3}`;
-  squadName.textContent = remotePlayer.name || squadName.textContent;
+  const partySize = squadState.accepted ? 3 : 2;
+  const partyMax = server.population > 32 ? 4 : 3;
+  squadServer.textContent = `${server.name.replace(/^.*?·\s*/, "")} · ${partySize}/${partyMax}`;
+  squadName.textContent = squadState.joinedName || remotePlayer.name || squadName.textContent;
   squadStatus.textContent = squadState.status;
   squadDistance.textContent = `${Math.max(1, Math.round(distance))}m`;
   squadSyncFill.style.transform = `scaleX(${THREE.MathUtils.clamp(squadState.sync, 0.06, 1)})`;
@@ -7045,6 +7272,7 @@ function handleGatewayEnter() {
 
 function bindInput() {
   addEventListener("keydown", (event) => {
+    music.userActivated = true;
     if (chatState.writing || document.activeElement === chatInput) {
       if (event.code === "Enter" && !event.isComposing) {
         event.preventDefault();
@@ -7060,6 +7288,15 @@ function bindInput() {
       if (event.code === "Enter" && !event.isComposing) {
         event.preventDefault();
         handleGatewayEnter();
+      }
+      return;
+    }
+    if (inviteState.active && (event.code === "KeyY" || event.code === "KeyN")) {
+      event.preventDefault();
+      if (event.code === "KeyY") {
+        acceptSquadInvite();
+      } else {
+        deferSquadInvite();
       }
       return;
     }
@@ -7124,7 +7361,10 @@ function bindInput() {
     setGatewayScreen("login");
     setGatewayStatus("已返回账号入口。");
   });
-  introStart.addEventListener("click", () => startGameFromIntro());
+  introStart.addEventListener("click", () => {
+    music.userActivated = true;
+    startGameFromIntro();
+  });
   chatForm.addEventListener("submit", (event) => {
     event.preventDefault();
     submitChatMessage();
@@ -7132,9 +7372,18 @@ function bindInput() {
   chatInput.addEventListener("focus", () => {
     if (!player.introOpen) setChatWriting(true);
   });
+  inviteAccept.addEventListener("click", () => {
+    music.userActivated = true;
+    acceptSquadInvite();
+  });
+  inviteLater.addEventListener("click", () => {
+    music.userActivated = true;
+    deferSquadInvite();
+  });
 
   canvas.addEventListener("pointerdown", (event) => {
     if (player.introOpen) return;
+    music.userActivated = true;
     unlockMusic();
     input.looking = true;
     input.lastPointer.set(event.clientX, event.clientY);
@@ -7160,6 +7409,7 @@ function bindInput() {
   touchPulse.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     if (player.introOpen) return;
+    music.userActivated = true;
     unlockMusic();
     playSfx("click", 0.8);
     touchPulse.classList.add("is-pressed");
@@ -7172,6 +7422,7 @@ function bindInput() {
   touchSonar.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     if (player.introOpen) return;
+    music.userActivated = true;
     unlockMusic();
     playSfx("click", 0.8);
     touchSonar.classList.add("is-pressed");
@@ -7184,6 +7435,7 @@ function bindInput() {
   touchBeacon.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     if (player.introOpen) return;
+    music.userActivated = true;
     unlockMusic();
     playSfx("click", 0.8);
     touchBeacon.classList.add("is-pressed");
@@ -7196,6 +7448,7 @@ function bindInput() {
   touchScanner.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     if (player.introOpen) return;
+    music.userActivated = true;
     unlockMusic();
     touchScanner.classList.add("is-pressed");
     touchScanner.setPointerCapture(event.pointerId);
@@ -7205,15 +7458,18 @@ function bindInput() {
     touchScanner.addEventListener(type, () => touchScanner.classList.remove("is-pressed"));
   });
   audioToggle.addEventListener("click", () => {
+    music.userActivated = true;
     toggleMusic();
   });
   codexToggle.addEventListener("click", () => {
     if (player.introOpen) return;
+    music.userActivated = true;
     unlockMusic();
     playSfx("click", 0.8);
     toggleCodexPanel();
   });
   codexClose.addEventListener("click", () => {
+    music.userActivated = true;
     playSfx("click", 0.65);
     toggleCodexPanel(false);
   });
@@ -7247,6 +7503,7 @@ function bindStick() {
   };
 
   stick.addEventListener("pointerdown", (event) => {
+    music.userActivated = true;
     unlockMusic();
     pointer = event.pointerId;
     stick.setPointerCapture(pointer);
@@ -7269,6 +7526,7 @@ function bindTouchButton(button, value) {
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     if (player.introOpen) return;
+    music.userActivated = true;
     unlockMusic();
     playSfx("click", 0.65);
     input.touchVertical = value;
@@ -7315,6 +7573,7 @@ function startGameFromIntro() {
 
 function unlockMusic(force = false) {
   if (!force && !music.enabled) return;
+  if (!music.userActivated) return;
   if (!music.context && !createMusicContext()) return;
   if (music.context.state === "suspended") music.context.resume();
   music.started = true;
@@ -8794,6 +9053,7 @@ function update(delta, time) {
   updateGateway(delta);
   updateServerChat(delta);
   updateServerEventHud(delta);
+  updateSquadInvite(delta);
   updateSquadHud(delta);
   updateMovement(delta);
   updateBiome(delta, time);
